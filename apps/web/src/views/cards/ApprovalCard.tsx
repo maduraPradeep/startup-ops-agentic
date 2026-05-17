@@ -1,5 +1,3 @@
-import { useApproveLeaveRequest } from '../../queries/useLeaveRequests';
-
 interface ApprovalAction {
   id: string;
   type: 'leave_request' | 'employee_action' | 'expense';
@@ -13,11 +11,12 @@ interface ApprovalAction {
 
 interface Props {
   action: ApprovalAction;
+  isPending: boolean;
+  onApprove: (id: string) => void;
+  onReject:  (id: string) => void;
 }
 
-export function ApprovalCard({ action }: Props) {
-  const approve = useApproveLeaveRequest();
-
+export function ApprovalCard({ action, isPending, onApprove, onReject }: Props) {
   return (
     <div className="border-l-4 border-amber-400 bg-amber-50 rounded-xl p-4 max-w-sm">
       <div className="flex items-center gap-2 mb-2">
@@ -29,9 +28,7 @@ export function ApprovalCard({ action }: Props) {
 
       {action.impact && (
         <ul className="text-xs text-gray-500 mb-3 space-y-0.5">
-          {action.impact.map((item, i) => (
-            <li key={i}>• {item}</li>
-          ))}
+          {action.impact.map((item, i) => <li key={i}>• {item}</li>)}
         </ul>
       )}
 
@@ -40,18 +37,22 @@ export function ApprovalCard({ action }: Props) {
       )}
 
       <div className="flex gap-2">
-        <button className="flex-1 text-sm border border-red-300 text-red-600 rounded-lg py-1.5 hover:bg-red-50">
+        <button
+          onClick={() => onReject(action.id)}
+          disabled={isPending}
+          className="flex-1 text-sm border border-red-300 text-red-600 rounded-lg py-1.5 hover:bg-red-50 disabled:opacity-50"
+        >
           ❌ Reject
         </button>
         <button className="flex-1 text-sm border border-gray-300 text-gray-600 rounded-lg py-1.5 hover:bg-gray-50">
           ✏️ Modify
         </button>
         <button
-          onClick={() => approve.mutate({ id: action.id })}
-          disabled={approve.isPending}
+          onClick={() => onApprove(action.id)}
+          disabled={isPending}
           className="flex-1 text-sm bg-green-600 text-white rounded-lg py-1.5 hover:bg-green-700 disabled:opacity-50"
         >
-          ✅ {approve.isPending ? 'Approving…' : 'Approve'}
+          ✅ {isPending ? 'Approving…' : 'Approve'}
         </button>
       </div>
     </div>

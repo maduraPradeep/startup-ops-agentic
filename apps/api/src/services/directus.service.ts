@@ -1,5 +1,6 @@
-const DIRECTUS_URL = process.env.DIRECTUS_URL ?? 'http://localhost:8055';
-const ADMIN_TOKEN  = process.env.DIRECTUS_ADMIN_TOKEN ?? '';
+// Read lazily — module-level constants are evaluated before dotenv.config() runs in ESM
+const url   = () => process.env.DIRECTUS_URL          ?? 'http://localhost:8055';
+const token = () => process.env.DIRECTUS_ADMIN_TOKEN  ?? '';
 
 interface ReadOptions {
   filter?: Record<string, unknown>;
@@ -15,11 +16,11 @@ async function request<T = unknown>(
   path: string,
   body?: unknown
 ): Promise<T> {
-  const res = await fetch(`${DIRECTUS_URL}${path}`, {
+  const res = await fetch(`${url()}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${ADMIN_TOKEN}`,
+      Authorization: `Bearer ${token()}`,
     },
     body: body ? JSON.stringify(body) : undefined,
   });

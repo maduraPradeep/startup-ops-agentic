@@ -1,4 +1,4 @@
-const DIRECTUS_URL = process.env.DIRECTUS_URL ?? 'http://localhost:8055';
+const directusUrl = () => process.env.DIRECTUS_URL ?? 'http://localhost:8055';
 
 export interface DirectusUser {
   id: string;
@@ -12,7 +12,7 @@ export interface DirectusUser {
 
 export const AuthModel = {
   async login(email: string, password: string): Promise<{ access_token: string } | null> {
-    const res = await fetch(`${DIRECTUS_URL}/auth/login`, {
+    const res = await fetch(`${directusUrl()}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -23,7 +23,7 @@ export const AuthModel = {
   },
 
   async getUser(accessToken: string): Promise<DirectusUser | null> {
-    const res = await fetch(`${DIRECTUS_URL}/users/me`, {
+    const res = await fetch(`${directusUrl()}/users/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) return null;
@@ -32,7 +32,7 @@ export const AuthModel = {
   },
 
   async refresh(refreshToken: string): Promise<unknown | null> {
-    const res = await fetch(`${DIRECTUS_URL}/auth/refresh`, {
+    const res = await fetch(`${directusUrl()}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),

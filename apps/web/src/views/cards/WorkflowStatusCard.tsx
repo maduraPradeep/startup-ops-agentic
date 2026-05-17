@@ -1,7 +1,8 @@
-import { useWorkflow } from '../../queries/useWorkflows';
+import type { Workflow } from '@ops/shared';
 
 interface Props {
-  workflowId: string;
+  workflow: Workflow | null;
+  isLoading: boolean;
   onCancel?: () => void;
 }
 
@@ -16,9 +17,7 @@ const STATE_LABELS: Record<string, string> = {
   completed:         '✅ Completed',
 };
 
-export function WorkflowStatusCard({ workflowId, onCancel }: Props) {
-  const { data: workflow, isLoading } = useWorkflow(workflowId);
-
+export function WorkflowStatusCard({ workflow, isLoading, onCancel }: Props) {
   if (isLoading || !workflow) {
     return <div className="animate-pulse h-32 bg-gray-100 rounded-xl" />;
   }
@@ -40,16 +39,12 @@ export function WorkflowStatusCard({ workflowId, onCancel }: Props) {
       <ol className="space-y-1.5 mb-4">
         {Object.entries(STATE_LABELS).map(([state, label]) => {
           const historyItem = workflow.history.find((h) => h.state === state as any);
-          const isCurrent = workflow.current_state === state;
-          const isPast = historyItem && !isCurrent;
+          const isCurrent   = workflow.current_state === state;
+          const isPast      = historyItem && !isCurrent;
           return (
             <li
               key={state}
-              className={`text-sm ${
-                isPast    ? 'text-gray-500' :
-                isCurrent ? 'text-indigo-600 font-medium' :
-                            'text-gray-300'
-              }`}
+              className={`text-sm ${isPast ? 'text-gray-500' : isCurrent ? 'text-indigo-600 font-medium' : 'text-gray-300'}`}
             >
               {label}
             </li>

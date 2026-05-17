@@ -35,6 +35,8 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
   fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
     try {
       await request.jwtVerify();
+      // Set tenantId here so it's available in all route handlers immediately after auth
+      request.tenantId = request.user.tenant_id;
     } catch {
       reply.status(401).send({ error: 'Unauthorized' });
     }

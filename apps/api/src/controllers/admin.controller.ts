@@ -1,12 +1,10 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { EntityModel } from '../models/entity.model.js';
+import { directus } from '../services/directus.service.js';
 
 export function createAdminController(fastify: FastifyInstance) {
   return {
     async listTenants(_request: FastifyRequest, reply: FastifyReply) {
-      const data = await EntityModel.describe('tenants')
-        .then(() => EntityModel.findAll('tenants', '', { sort: ['name'] }))
-        .catch(() => []);
+      const data = await directus.readItems('tenants', { sort: ['name'] });
       return reply.send({ success: true, data });
     },
 

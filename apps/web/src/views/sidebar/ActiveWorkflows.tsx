@@ -1,5 +1,5 @@
-import { useWorkflows } from '../../queries/useWorkflows';
 import { clsx } from 'clsx';
+import type { Workflow } from '@ops/shared';
 
 const STATE_BADGE: Record<string, string> = {
   initiated:         'bg-blue-100 text-blue-700',
@@ -13,26 +13,22 @@ const STATE_BADGE: Record<string, string> = {
   error:             'bg-red-100 text-red-700',
 };
 
-export function ActiveWorkflows() {
-  const { data, isLoading } = useWorkflows();
-  const workflows = data?.data ?? [];
+interface Props {
+  workflows: Workflow[];
+  isLoading: boolean;
+}
 
+export function ActiveWorkflows({ workflows, isLoading }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-2 p-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
-        ))}
+        {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />)}
       </div>
     );
   }
 
   if (workflows.length === 0) {
-    return (
-      <div className="p-4 text-center text-sm text-gray-400">
-        No active workflows
-      </div>
-    );
+    return <div className="p-4 text-center text-sm text-gray-400">No active workflows</div>;
   }
 
   return (
@@ -46,10 +42,7 @@ export function ActiveWorkflows() {
             </span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full">
-            <div
-              className="h-full bg-indigo-500 rounded-full"
-              style={{ width: `${wf.progress}%` }}
-            />
+            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${wf.progress}%` }} />
           </div>
         </div>
       ))}

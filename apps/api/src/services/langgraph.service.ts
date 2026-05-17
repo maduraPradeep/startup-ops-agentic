@@ -15,15 +15,15 @@ interface SendMessageParams {
   actor: { userId: string; email: string; name: string; role: string };
 }
 
-const LANGGRAPH_URL = process.env.LANGGRAPH_URL ?? 'http://localhost:8000';
-const LANGGRAPH_API_KEY = process.env.LANGGRAPH_API_KEY ?? '';
+const lgUrl = () => process.env.LANGGRAPH_URL     ?? 'http://localhost:8000';
+const lgKey = () => process.env.LANGGRAPH_API_KEY ?? '';
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${LANGGRAPH_URL}${path}`, {
+  const response = await fetch(`${lgUrl()}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(LANGGRAPH_API_KEY ? { 'X-API-Key': LANGGRAPH_API_KEY } : {}),
+      ...(lgKey() ? { 'X-API-Key': lgKey() } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -44,7 +44,7 @@ export const langraphService = {
     post<unknown>('/invoke/message', params),
 
   getWorkflowState: (workflowId: string) =>
-    fetch(`${LANGGRAPH_URL}/workflows/${workflowId}`, {
-      headers: LANGGRAPH_API_KEY ? { 'X-API-Key': LANGGRAPH_API_KEY } : {},
+    fetch(`${lgUrl()}/workflows/${workflowId}`, {
+      headers: lgKey() ? { 'X-API-Key': lgKey() } : {},
     }).then((r) => r.json()),
 };

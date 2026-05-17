@@ -17,9 +17,7 @@ export function ActionCard({ title, description, actions, onSelect }: Props) {
   return (
     <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm max-w-sm">
       <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-      {description && (
-        <p className="text-sm text-gray-500 mb-3">{description}</p>
-      )}
+      {description && <p className="text-sm text-gray-500 mb-3">{description}</p>}
       <div className="flex flex-col gap-2">
         {actions.map((action) => (
           <button

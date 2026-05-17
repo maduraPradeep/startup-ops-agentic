@@ -1,11 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { ApprovalModel } from '../models/approval.model.js';
 
-type DecideParams = {
-  Params: { id: string };
-  Body: { decision: 'approved' | 'rejected'; notes?: string };
-};
-
 export function createApprovalController(fastify: FastifyInstance) {
   return {
     async listPending(request: FastifyRequest, reply: FastifyReply) {
@@ -13,9 +8,11 @@ export function createApprovalController(fastify: FastifyInstance) {
       return reply.send({ success: true, data });
     },
 
-    async decide(request: FastifyRequest<DecideParams>, reply: FastifyReply) {
-      const { id } = request.params;
-      const { decision, notes } = request.body;
+    async decide(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string };
+      const { decision, notes } = request.body as {
+        decision: 'approved' | 'rejected'; notes?: string;
+      };
 
       const updated = await ApprovalModel.decide(id, decision, notes, request.user.userId);
 

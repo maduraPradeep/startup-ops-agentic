@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 
 interface AuthUser {
   id: string;
@@ -20,13 +20,24 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   devtools(
-    (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
-      clearAuth: () => set({ user: null, token: null, isAuthenticated: false }),
-    }),
+    persist(
+      (set) => ({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
+        clearAuth: () => set({ user: null, token: null, isAuthenticated: false }),
+      }),
+      {
+        name: 'ops-auth',
+        // Only persist the fields needed to restore session
+        partialize: (state) => ({
+          user:            state.user,
+          token:           state.token,
+          isAuthenticated: state.isAuthenticated,
+        }),
+      }
+    ),
     { name: 'auth' }
   )
 );

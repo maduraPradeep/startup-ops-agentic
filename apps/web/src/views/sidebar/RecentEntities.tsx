@@ -1,13 +1,11 @@
-import { useEmployees } from '../../queries/useEmployees';
-import { useLeaveRequests } from '../../queries/useLeaveRequests';
+import type { Employee, LeaveRequest } from '@ops/shared';
 
-export function RecentEntities() {
-  const { data: employeesData } = useEmployees();
-  const { data: leaveData } = useLeaveRequests();
+interface Props {
+  employees: Employee[];
+  leaveRequests: LeaveRequest[];
+}
 
-  const employees = employeesData?.data?.slice(0, 3) ?? [];
-  const leaveRequests = leaveData?.data?.slice(0, 3) ?? [];
-
+export function RecentEntities({ employees, leaveRequests }: Props) {
   return (
     <div className="p-3 space-y-4">
       {employees.length > 0 && (
@@ -16,7 +14,7 @@ export function RecentEntities() {
           <div className="space-y-1">
             {employees.map((emp) => (
               <div key={emp.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
+                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 shrink-0">
                   {emp.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div>

@@ -1,0 +1,718 @@
+version: 1
+
+collections:
+  - collection: tenants
+    meta:
+      icon: corporate_fare
+      note: Platform-level tenant registry
+    schema: { name: tenants }
+
+  - collection: departments
+    meta:
+      icon: account_tree
+    schema: { name: departments }
+
+  - collection: employees
+    meta:
+      icon: people
+      sort_field: name
+    schema: { name: employees }
+
+  - collection: leave_policies
+    meta:
+      icon: policy
+    schema: { name: leave_policies }
+
+  - collection: leave_requests
+    meta:
+      icon: event_available
+      sort_field: created_at
+    schema: { name: leave_requests }
+
+  - collection: projects
+    meta:
+      icon: work
+      sort_field: name
+    schema: { name: projects }
+
+  - collection: documents
+    meta:
+      icon: description
+    schema: { name: documents }
+
+  - collection: approval_chains
+    meta:
+      icon: approval
+    schema: { name: approval_chains }
+
+  - collection: audit_logs
+    meta:
+      icon: history
+      sort_field: timestamp
+    schema: { name: audit_logs }
+
+  - collection: conversations
+    meta:
+      icon: chat
+      sort_field: created_at
+    schema: { name: conversations }
+
+fields:
+  # ── tenants ──────────────────────────────────────────────────
+  - collection: tenants
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: tenants
+    field: name
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: tenants
+    field: slug
+    type: string
+    schema: { is_nullable: false, is_unique: true }
+    meta: { interface: input, required: true }
+
+  - collection: tenants
+    field: plan
+    type: string
+    schema: { default_value: starter }
+    meta: { interface: select-dropdown, options: { choices: [{ text: Starter, value: starter }, { text: Growth, value: growth }, { text: Enterprise, value: enterprise }] } }
+
+  - collection: tenants
+    field: settings
+    type: json
+    schema: { default_value: '{}' }
+    meta: { interface: input-code, options: { language: json } }
+
+  - collection: tenants
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  # ── departments ───────────────────────────────────────────────
+  - collection: departments
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: departments
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: tenants, foreign_key_column: id }
+    meta: { hidden: true }
+
+  - collection: departments
+    field: name
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: departments
+    field: head
+    type: uuid
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  # ── employees ─────────────────────────────────────────────────
+  - collection: employees
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: employees
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: tenants, foreign_key_column: id }
+    meta: { hidden: true }
+
+  - collection: employees
+    field: name
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: employees
+    field: email
+    type: string
+    schema: { is_nullable: false, is_unique: true }
+    meta: { interface: input, required: true }
+
+  - collection: employees
+    field: role
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: employees
+    field: department
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: departments, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: employees
+    field: manager
+    type: uuid
+    schema: { is_nullable: true, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: employees
+    field: employment_status
+    type: string
+    schema: { default_value: active }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Active,     value: active }
+          - { text: Suspended,  value: suspended }
+          - { text: On Leave,   value: on_leave }
+          - { text: Terminated, value: terminated }
+          - { text: Archived,   value: archived }
+
+  - collection: employees
+    field: employment_type
+    type: string
+    schema: { default_value: full_time }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Full Time,  value: full_time }
+          - { text: Part Time,  value: part_time }
+          - { text: Contractor, value: contractor }
+          - { text: Intern,     value: intern }
+
+  - collection: employees
+    field: start_date
+    type: date
+    schema: { is_nullable: false }
+    meta: { interface: datetime, required: true }
+
+  - collection: employees
+    field: location
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: employees
+    field: skills
+    type: json
+    schema: { default_value: '[]' }
+    meta: { interface: tags }
+
+  - collection: employees
+    field: slack_id
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: employees
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  - collection: employees
+    field: updated_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true, hidden: true, special: [date-updated] }
+
+  # ── leave_policies ────────────────────────────────────────────
+  - collection: leave_policies
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: leave_policies
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: leave_policies
+    field: name
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: leave_policies
+    field: leave_type
+    type: string
+    schema: { is_nullable: false }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Annual,      value: annual }
+          - { text: Sick,        value: sick }
+          - { text: Parental,    value: parental }
+          - { text: Bereavement, value: bereavement }
+          - { text: Unpaid,      value: unpaid }
+          - { text: Wellness,    value: wellness }
+          - { text: Other,       value: other }
+
+  - collection: leave_policies
+    field: max_days_per_year
+    type: integer
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: leave_policies
+    field: requires_approval
+    type: boolean
+    schema: { default_value: true }
+    meta: { interface: boolean }
+
+  - collection: leave_policies
+    field: notice_days_required
+    type: integer
+    schema: { default_value: 0 }
+    meta: { interface: input }
+
+  # ── leave_requests ────────────────────────────────────────────
+  - collection: leave_requests
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: leave_requests
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: leave_requests
+    field: employee
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o, required: true }
+
+  - collection: leave_requests
+    field: policy
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: leave_policies, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o, required: true }
+
+  - collection: leave_requests
+    field: leave_type
+    type: string
+    schema: { is_nullable: false }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Annual,      value: annual }
+          - { text: Sick,        value: sick }
+          - { text: Parental,    value: parental }
+          - { text: Bereavement, value: bereavement }
+          - { text: Unpaid,      value: unpaid }
+          - { text: Wellness,    value: wellness }
+          - { text: Other,       value: other }
+
+  - collection: leave_requests
+    field: start_date
+    type: date
+    schema: { is_nullable: false }
+    meta: { interface: datetime, required: true }
+
+  - collection: leave_requests
+    field: end_date
+    type: date
+    schema: { is_nullable: false }
+    meta: { interface: datetime, required: true }
+
+  - collection: leave_requests
+    field: days_requested
+    type: decimal
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: leave_requests
+    field: reason
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: leave_requests
+    field: status
+    type: string
+    schema: { default_value: draft }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Draft,        value: draft }
+          - { text: Submitted,    value: submitted }
+          - { text: Under Review, value: under_review }
+          - { text: Approved,     value: approved }
+          - { text: Rejected,     value: rejected }
+          - { text: Cancelled,    value: cancelled }
+          - { text: Taken,        value: taken }
+
+  - collection: leave_requests
+    field: approver
+    type: uuid
+    schema: { is_nullable: true, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: leave_requests
+    field: approved_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: leave_requests
+    field: approval_notes
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: leave_requests
+    field: submitted_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: leave_requests
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  - collection: leave_requests
+    field: updated_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true, hidden: true, special: [date-updated] }
+
+  # ── projects ──────────────────────────────────────────────────
+  - collection: projects
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: projects
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: projects
+    field: name
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: projects
+    field: description
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: projects
+    field: status
+    type: string
+    schema: { default_value: planning }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Planning,   value: planning }
+          - { text: Active,     value: active }
+          - { text: On Hold,    value: on_hold }
+          - { text: Completed,  value: completed }
+          - { text: Cancelled,  value: cancelled }
+
+  - collection: projects
+    field: owner
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o, required: true }
+
+  - collection: projects
+    field: department
+    type: uuid
+    schema: { is_nullable: true, foreign_key_table: departments, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: projects
+    field: start_date
+    type: date
+    schema: { is_nullable: true }
+    meta: { interface: datetime }
+
+  - collection: projects
+    field: end_date
+    type: date
+    schema: { is_nullable: true }
+    meta: { interface: datetime }
+
+  - collection: projects
+    field: budget
+    type: decimal
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: projects
+    field: tags
+    type: json
+    schema: { default_value: '[]' }
+    meta: { interface: tags }
+
+  - collection: projects
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  - collection: projects
+    field: updated_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true, hidden: true, special: [date-updated] }
+
+  # ── approval_chains ───────────────────────────────────────────
+  - collection: approval_chains
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: approval_chains
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: approval_chains
+    field: title
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: approval_chains
+    field: description
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: approval_chains
+    field: status
+    type: string
+    schema: { default_value: pending }
+    meta:
+      interface: select-dropdown
+      options:
+        choices:
+          - { text: Pending,  value: pending }
+          - { text: Approved, value: approved }
+          - { text: Rejected, value: rejected }
+
+  - collection: approval_chains
+    field: approver
+    type: uuid
+    schema: { is_nullable: true, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: approval_chains
+    field: approval_notes
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: approval_chains
+    field: decided_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: approval_chains
+    field: decided_by
+    type: uuid
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: approval_chains
+    field: deadline
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { interface: datetime }
+
+  - collection: approval_chains
+    field: entity_collection
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: approval_chains
+    field: entity_id
+    type: uuid
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: approval_chains
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  # ── audit_logs ────────────────────────────────────────────────
+  - collection: audit_logs
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: audit_logs
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: audit_logs
+    field: actor_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { readonly: true }
+
+  - collection: audit_logs
+    field: actor_email
+    type: string
+    schema: { is_nullable: false }
+    meta: { readonly: true }
+
+  - collection: audit_logs
+    field: action
+    type: string
+    schema: { is_nullable: false }
+    meta: { readonly: true }
+
+  - collection: audit_logs
+    field: collection
+    type: string
+    schema: { is_nullable: false }
+    meta: { readonly: true }
+
+  - collection: audit_logs
+    field: item_id
+    type: uuid
+    schema: { is_nullable: true }
+    meta: { readonly: true }
+
+  - collection: audit_logs
+    field: changes
+    type: json
+    schema: { is_nullable: true }
+    meta: { interface: input-code, readonly: true }
+
+  - collection: audit_logs
+    field: metadata
+    type: json
+    schema: { is_nullable: true }
+    meta: { interface: input-code, readonly: true }
+
+  - collection: audit_logs
+    field: timestamp
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true }
+
+  # ── conversations ─────────────────────────────────────────────
+  - collection: conversations
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: conversations
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { hidden: true }
+
+  - collection: conversations
+    field: user_id
+    type: uuid
+    schema: { is_nullable: false }
+    meta: { readonly: true }
+
+  - collection: conversations
+    field: title
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: conversations
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  - collection: conversations
+    field: updated_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true, hidden: true, special: [date-updated] }
+
+relations:
+  - collection: departments
+    field: tenant_id
+    related_collection: tenants
+    meta: { many_collection: departments, many_field: tenant_id, one_collection: tenants, one_field: null }
+
+  - collection: employees
+    field: tenant_id
+    related_collection: tenants
+    meta: { many_collection: employees, many_field: tenant_id, one_collection: tenants, one_field: null }
+
+  - collection: employees
+    field: department
+    related_collection: departments
+    meta: { many_collection: employees, many_field: department, one_collection: departments, one_field: null }
+
+  - collection: employees
+    field: manager
+    related_collection: employees
+    meta: { many_collection: employees, many_field: manager, one_collection: employees, one_field: null }
+
+  - collection: leave_requests
+    field: employee
+    related_collection: employees
+    meta: { many_collection: leave_requests, many_field: employee, one_collection: employees, one_field: null }
+
+  - collection: leave_requests
+    field: policy
+    related_collection: leave_policies
+    meta: { many_collection: leave_requests, many_field: policy, one_collection: leave_policies, one_field: null }
+
+  - collection: leave_requests
+    field: approver
+    related_collection: employees
+    meta: { many_collection: leave_requests, many_field: approver, one_collection: employees, one_field: null }
+
+  - collection: projects
+    field: owner
+    related_collection: employees
+    meta: { many_collection: projects, many_field: owner, one_collection: employees, one_field: null }
+
+  - collection: projects
+    field: department
+    related_collection: departments
+    meta: { many_collection: projects, many_field: department, one_collection: departments, one_field: null }
+
+  - collection: approval_chains
+    field: approver
+    related_collection: employees
+    meta: { many_collection: approval_chains, many_field: approver, one_collection: employees, one_field: null }

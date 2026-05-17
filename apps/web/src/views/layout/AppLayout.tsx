@@ -1,28 +1,38 @@
 import { clsx } from 'clsx';
 import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut } from 'lucide-react';
-import { useSidebarStore } from '../../stores/sidebar.store';
-import { useAuthStore } from '../../stores/auth.store';
-import { ActiveWorkflows } from '../sidebar/ActiveWorkflows';
-import { PendingApprovals } from '../sidebar/PendingApprovals';
-import { RecentEntities } from '../sidebar/RecentEntities';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
 const NAV_ITEMS: { panel: SidebarPanel; icon: React.ReactNode; label: string }[] = [
-  { panel: 'workflows',     icon: <GitBranch size={18} />,      label: 'Workflows' },
-  { panel: 'approvals',     icon: <CheckSquare size={18} />,    label: 'Approvals' },
+  { panel: 'workflows',     icon: <GitBranch size={18} />,       label: 'Workflows' },
+  { panel: 'approvals',     icon: <CheckSquare size={18} />,     label: 'Approvals' },
   { panel: 'entities',      icon: <LayoutDashboard size={18} />, label: 'Entities' },
-  { panel: 'notifications', icon: <Bell size={18} />,           label: 'Alerts' },
+  { panel: 'notifications', icon: <Bell size={18} />,            label: 'Alerts' },
 ];
 
 interface Props {
+  activePanel: SidebarPanel;
+  isCollapsed: boolean;
+  pendingApprovalCount: number;
+  user: { name: string; role: string; tenantName: string } | null;
+  sidebarContent: React.ReactNode;
+  onPanelChange: (panel: SidebarPanel) => void;
+  onToggleCollapse: () => void;
+  onSignOut: () => void;
   children: React.ReactNode;
 }
 
-export function AppLayout({ children }: Props) {
-  const { activePanel, isCollapsed, setActivePanel, toggleCollapse, pendingApprovalCount } = useSidebarStore();
-  const { user, clearAuth } = useAuthStore();
-
+export function AppLayout({
+  activePanel,
+  isCollapsed,
+  pendingApprovalCount,
+  user,
+  sidebarContent,
+  onPanelChange,
+  onToggleCollapse,
+  onSignOut,
+  children,
+}: Props) {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <aside className={clsx(
@@ -45,12 +55,10 @@ export function AppLayout({ children }: Props) {
           {NAV_ITEMS.map(({ panel, icon, label }) => (
             <button
               key={panel}
-              onClick={() => setActivePanel(activePanel === panel ? null : panel)}
+              onClick={() => onPanelChange(activePanel === panel ? null : panel)}
               className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors relative',
-                activePanel === panel
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-600 hover:bg-gray-50'
+                activePanel === panel ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
               )}
             >
               <span className="shrink-0">{icon}</span>
@@ -72,12 +80,7 @@ export function AppLayout({ children }: Props) {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 pt-3 pb-1">
               {NAV_ITEMS.find((n) => n.panel === activePanel)?.label}
             </p>
-            {activePanel === 'workflows'     && <ActiveWorkflows />}
-            {activePanel === 'approvals'     && <PendingApprovals />}
-            {activePanel === 'entities'      && <RecentEntities />}
-            {activePanel === 'notifications' && (
-              <p className="text-sm text-gray-400 px-4 py-3">No new notifications</p>
-            )}
+            {sidebarContent}
           </div>
         )}
 
@@ -94,18 +97,10 @@ export function AppLayout({ children }: Props) {
             </div>
           )}
           <div className="flex gap-1">
-            <button
-              onClick={clearAuth}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              title="Sign out"
-            >
+            <button onClick={onSignOut} className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Sign out">
               <LogOut size={16} />
             </button>
-            <button
-              onClick={toggleCollapse}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              title={isCollapsed ? 'Expand' : 'Collapse'}
-            >
+            <button onClick={onToggleCollapse} className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">
               <ChevronLeft size={16} className={clsx('transition-transform', isCollapsed && 'rotate-180')} />
             </button>
           </div>

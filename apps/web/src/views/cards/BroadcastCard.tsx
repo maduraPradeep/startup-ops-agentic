@@ -16,16 +16,9 @@ const PRIORITY_STYLES = {
   urgent: 'border-red-500 bg-red-50',
 };
 
-const PRIORITY_ICONS = {
-  low: '📢',
-  normal: '📣',
-  high: '⚠️',
-  urgent: '🚨',
-};
+const PRIORITY_ICONS = { low: '📢', normal: '📣', high: '⚠️', urgent: '🚨' };
 
-interface Props {
-  broadcast: BroadcastMessage;
-}
+interface Props { broadcast: BroadcastMessage }
 
 export function BroadcastCard({ broadcast }: Props) {
   return (

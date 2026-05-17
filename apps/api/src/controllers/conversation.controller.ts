@@ -32,13 +32,11 @@ export function createConversationController(fastify: FastifyInstance) {
         }
       });
 
-      // Fan out Redis pub/sub to this socket
       const subscriber = fastify.redis.duplicate();
       subscriber.subscribe(`user:${user.userId}:messages`).catch((err: Error) =>
         fastify.log.error(err, 'Redis subscribe error')
       );
       subscriber.on('message', (_ch: string, msg: string) => socket.send(msg));
-
       socket.on('close', () => { subscriber.unsubscribe(); subscriber.quit(); });
     },
 
