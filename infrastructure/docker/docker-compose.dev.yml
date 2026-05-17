@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ops_platform
+      POSTGRES_USER: ops_user
+      POSTGRES_PASSWORD: ops_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ../directus/schema/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ops_user -d ops_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  directus:
+    image: directus/directus:11
+    ports:
+      - "8055:8055"
+    environment:
+      SECRET: "dev-secret-change-in-prod"
+      DB_CLIENT: pg
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ops_platform
+      DB_USER: ops_user
+      DB_PASSWORD: ops_password
+      ADMIN_EMAIL: admin@ops-platform.com
+      ADMIN_PASSWORD: admin123
+      WEBSOCKETS_ENABLED: "true"
+      EXTENSIONS_AUTO_RELOAD: "true"
+      CORS_ENABLED: "true"
+      CORS_ORIGIN: "true"
+    volumes:
+      - ../directus/extensions:/directus/extensions
+      - directus_dev_uploads:/directus/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+
+volumes:
+  postgres_dev_data:
+  directus_dev_uploads:
+  redis_dev_data:
