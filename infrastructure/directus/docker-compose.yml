@@ -1,9 +1,10 @@
-version: '3.8'
 services:
   directus:
     image: directus/directus:11
     ports:
       - "8055:8055"
+    env_file:
+      - ../../.env
     environment:
       SECRET: "${DIRECTUS_SECRET}"
       DB_CLIENT: "pg"
@@ -14,6 +15,7 @@ services:
       DB_PASSWORD: "${DB_PASSWORD}"
       ADMIN_EMAIL: "${DIRECTUS_ADMIN_EMAIL}"
       ADMIN_PASSWORD: "${DIRECTUS_ADMIN_PASSWORD}"
+      ADMIN_TOKEN: "${DIRECTUS_ADMIN_TOKEN}"
       WEBSOCKETS_ENABLED: "true"
       FLOWS_EXEC_ALLOWED_MODULES: "true"
       EXTENSIONS_AUTO_RELOAD: "true"
@@ -21,14 +23,29 @@ services:
       CORS_ORIGIN: "true"
     volumes:
       - ./extensions:/directus/extensions
+      - ./schema:/directus/schema
       - directus_uploads:/directus/uploads
+    command: >
+      sh -c "
+        node dist/cli/run.js bootstrap &&
+        node dist/cli/run.js schema apply --yes /directus/schema/snapshot.yaml || echo 'Schema apply skipped (may already be applied)' &&
+        node dist/cli/run.js start
+      "
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8055/server/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     restart: unless-stopped
 
   postgres:
     image: pgvector/pgvector:pg16
+    env_file:
+      - ../../.env
     environment:
       POSTGRES_DB: "ops_platform"
       POSTGRES_USER: "${DB_USER}"

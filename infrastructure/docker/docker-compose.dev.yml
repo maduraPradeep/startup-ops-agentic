@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -32,16 +30,24 @@ services:
       DB_PASSWORD: ops_password
       ADMIN_EMAIL: admin@ops-platform.com
       ADMIN_PASSWORD: admin123
+      ADMIN_TOKEN: dev-admin-token
       WEBSOCKETS_ENABLED: "true"
       EXTENSIONS_AUTO_RELOAD: "true"
       CORS_ENABLED: "true"
       CORS_ORIGIN: "true"
     volumes:
       - ../directus/extensions:/directus/extensions
+      - ../directus/schema:/directus/schema
       - directus_dev_uploads:/directus/uploads
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8055/server/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   redis:
     image: redis:7-alpine

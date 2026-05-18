@@ -483,6 +483,61 @@ fields:
     schema: { is_nullable: true }
     meta: { readonly: true, hidden: true, special: [date-updated] }
 
+  # ── documents ─────────────────────────────────────────────────
+  - collection: documents
+    field: id
+    type: uuid
+    schema: { is_primary_key: true, has_auto_increment: false }
+    meta: { hidden: true, readonly: true }
+
+  - collection: documents
+    field: tenant_id
+    type: uuid
+    schema: { is_nullable: false, foreign_key_table: tenants, foreign_key_column: id }
+    meta: { hidden: true }
+
+  - collection: documents
+    field: title
+    type: string
+    schema: { is_nullable: false }
+    meta: { interface: input, required: true }
+
+  - collection: documents
+    field: content
+    type: text
+    schema: { is_nullable: true }
+    meta: { interface: input-multiline }
+
+  - collection: documents
+    field: category
+    type: string
+    schema: { is_nullable: true }
+    meta: { interface: input }
+
+  - collection: documents
+    field: tags
+    type: json
+    schema: { default_value: '[]' }
+    meta: { interface: tags }
+
+  - collection: documents
+    field: created_by
+    type: uuid
+    schema: { is_nullable: true, foreign_key_table: employees, foreign_key_column: id }
+    meta: { interface: select-dropdown-m2o }
+
+  - collection: documents
+    field: created_at
+    type: timestamp
+    schema: { default_value: now() }
+    meta: { readonly: true, hidden: true }
+
+  - collection: documents
+    field: updated_at
+    type: timestamp
+    schema: { is_nullable: true }
+    meta: { readonly: true, hidden: true, special: [date-updated] }
+
   # ── approval_chains ───────────────────────────────────────────
   - collection: approval_chains
     field: id
@@ -711,6 +766,16 @@ relations:
     field: department
     related_collection: departments
     meta: { many_collection: projects, many_field: department, one_collection: departments, one_field: null }
+
+  - collection: documents
+    field: tenant_id
+    related_collection: tenants
+    meta: { many_collection: documents, many_field: tenant_id, one_collection: tenants, one_field: null }
+
+  - collection: documents
+    field: created_by
+    related_collection: employees
+    meta: { many_collection: documents, many_field: created_by, one_collection: employees, one_field: null }
 
   - collection: approval_chains
     field: approver
