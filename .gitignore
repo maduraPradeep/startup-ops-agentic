@@ -8,3 +8,4 @@ coverage/
 .DS_Store
 .gitnexus
 services/langgraph/.venv/
+.dev-seeded
