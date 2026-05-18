@@ -1,5 +1,15 @@
 # Development Guide
 
+## Quick Start
+
+```bash
+./dev.sh
+```
+
+Starts all services, seeds Directus on first run, and prints URLs when ready. Press `Ctrl+C` to stop everything. Logs land in `.dev-logs/`.
+
+---
+
 ## Architecture Overview
 
 The platform consists of five services that must all be running for full functionality:
