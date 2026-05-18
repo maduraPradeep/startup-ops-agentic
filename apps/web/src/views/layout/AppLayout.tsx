@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut, Plus } from 'lucide-react';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
@@ -17,6 +17,7 @@ interface Props {
   user: { name: string; role: string; tenantName: string } | null;
   sidebarContent: React.ReactNode;
   onPanelChange: (panel: SidebarPanel) => void;
+  onNavigateWorkflowBuilder?: () => void;
   onToggleCollapse: () => void;
   onSignOut: () => void;
   children: React.ReactNode;
@@ -29,6 +30,7 @@ export function AppLayout({
   user,
   sidebarContent,
   onPanelChange,
+  onNavigateWorkflowBuilder,
   onToggleCollapse,
   onSignOut,
   children,
@@ -81,6 +83,17 @@ export function AppLayout({
               {NAV_ITEMS.find((n) => n.panel === activePanel)?.label}
             </p>
             {sidebarContent}
+      {activePanel === 'workflows' && !isCollapsed && (
+        <div className="px-4 py-3 border-t border-gray-100">
+          <button
+            onClick={onNavigateWorkflowBuilder}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <Plus size={14} />
+            Build Workflow
+          </button>
+        </div>
+      )}
           </div>
         )}
 

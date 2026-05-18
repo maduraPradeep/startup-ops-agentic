@@ -41,7 +41,8 @@ VALUES
   ('documents',      'description',     NULL,                              7,  'all', 'open'),
   ('approval_chains','approval',        NULL,                              8,  'all', 'open'),
   ('audit_logs',     'history',         NULL,                              9,  'all', 'open'),
-  ('conversations',  'chat',            NULL,                              10, 'all', 'open')
+  ('conversations',  'chat',            NULL,                              10, 'all', 'open'),
+  ('workflow_definitions', 'git_branch', NULL,                             11, 'all', 'open')
 ON CONFLICT (collection) DO NOTHING;
 "
 
@@ -63,7 +64,8 @@ VALUES
   ('documents',      'tenant_id',   'tenants',        'nullify'),
   ('documents',      'created_by',  'employees',      'nullify'),
   ('audit_logs',     'tenant_id',   'tenants',        'nullify'),
-  ('conversations',  'tenant_id',   'tenants',        'nullify')
+  ('conversations',  'tenant_id',   'tenants',        'nullify'),
+  ('workflow_definitions', 'tenant_id', 'tenants',     'nullify')
 ON CONFLICT DO NOTHING;
 "
 
@@ -135,5 +137,14 @@ patch_field audit_logs tenant_id '{"meta":{"hidden":true}}'
 # conversations
 patch_field conversations tenant_id '{"meta":{"hidden":true}}'
 patch_field conversations updated_at '{"meta":{"hidden":true,"readonly":true}}'
+
+# workflow_definitions
+patch_field workflow_definitions tenant_id '{"meta":{"hidden":true}}'
+patch_field workflow_definitions trigger   '{"meta":{"interface":"input-code","options":{"language":"json"}}}'
+patch_field workflow_definitions entities  '{"meta":{"interface":"tags"}}'
+patch_field workflow_definitions output    '{"meta":{"interface":"input-code","options":{"language":"json"}}}'
+patch_field workflow_definitions status    '{"meta":{"interface":"select-dropdown","options":{"choices":[{"text":"Active","value":"active"},{"text":"Inactive","value":"inactive"}]}}}'
+patch_field workflow_definitions created_at '{"meta":{"hidden":true,"readonly":true}}'
+patch_field workflow_definitions updated_at '{"meta":{"hidden":true,"readonly":true}}'
 
 echo "Done. Open http://localhost:8055 — all collections should now be visible."

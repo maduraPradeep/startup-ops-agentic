@@ -146,6 +146,21 @@ CREATE TABLE IF NOT EXISTS conversations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── Workflow Definitions ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS workflow_definitions (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        VARCHAR(200) NOT NULL,
+  description TEXT,
+  trigger     JSONB NOT NULL, -- { type: 'message' | 'event' | 'schedule', ... }
+  prompt      TEXT NOT NULL,
+  entities    JSONB DEFAULT '[]', -- List of collections
+  output      JSONB NOT NULL, -- { type: 'message' | 'task', ... }
+  status      VARCHAR(50) DEFAULT 'active',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ── Indexes ───────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_employees_tenant        ON employees(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_tenant   ON leave_requests(tenant_id);
