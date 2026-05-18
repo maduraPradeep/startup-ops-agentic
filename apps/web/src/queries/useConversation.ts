@@ -8,7 +8,7 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
 
 export function useConversationSocket() {
-  const { appendMessage, setTyping } = useConversationStore();
+  const { appendMessage, setMessages, setTyping } = useConversationStore();
   const { user, token } = useAuthStore();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelayIndexRef = useRef(0);
@@ -34,12 +34,30 @@ export function useConversationSocket() {
         if (cancelled) return;
         setConnectionStatus('connected');
         reconnectDelayIndexRef.current = 0;
+        // Request conversation history on connect
+        const { conversationId: convId } = useConversationStore.getState();
+        if (convId) {
+          ws.send(JSON.stringify({ type: 'load_history', conversationId: convId }));
+        }
       };
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data) as { type: string; data: unknown };
         if (data.type === 'message') {
           appendMessage(data.data as Message);
+        } else if (data.type === 'history') {
+          setMessages(data.data as Message[]);
+        } else if (data.type === 'broadcast:new') {
+          const broadcast = data.data as Record<string, any>;
+          const broadcastMsg: Message = {
+            id: `broadcast-${Date.now()}`,
+            conversationId: useConversationStore.getState().conversationId ?? '',
+            content: broadcast.title ?? 'New broadcast',
+            sender: { id: 'notification', name: 'Broadcast', type: 'agent' },
+            timestamp: broadcast.sentAt ?? new Date().toISOString(),
+            payload: { type: 'broadcast', broadcast: broadcast as any },
+          } as unknown as Message;
+          appendMessage(broadcastMsg);
         } else if (data.type === 'agent:typing') {
           const { agent, typing } = data.data as { agent: string; typing: boolean };
           setTyping(agent, typing);
@@ -81,7 +99,7 @@ export function useConversationSocket() {
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [token, user, appendMessage, setTyping]);
+  }, [token, user, appendMessage, setMessages, setTyping]);
 
   const sendMessage = (conversationId: string, content: string) => {
     // Optimistically append the user's own message (Task 13)
