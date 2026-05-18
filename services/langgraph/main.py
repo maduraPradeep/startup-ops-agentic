@@ -11,6 +11,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langgraph.graph import StateGraph, END
+import httpx
+import os
 
 app = FastAPI(title="Ops Platform — LangGraph Service", version="0.1.0")
 
@@ -143,6 +145,20 @@ executor = workflow.compile()
 # ── In-memory store for workflows ──────────────────────────────────────────
 _workflows: Dict[str, Dict] = {}
 
+DIRECTUS_URL = os.getenv("DIRECTUS_URL", "http://localhost:8055")
+DIRECTUS_TOKEN = os.getenv("DIRECTUS_ADMIN_TOKEN", "your-static-admin-token")
+
+async def get_workflow_definitions(tenant_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{DIRECTUS_URL}/items/workflow_definitions",
+            params={"filter": {"tenant_id": {"_eq": tenant_id}, "status": {"_eq": "active"}}},
+            headers={"Authorization": f"Bearer {DIRECTUS_TOKEN}"}
+        )
+        if response.status_code == 200:
+            return response.json().get("data", [])
+        return []
+
 # ── Request / response models ──────────────────────────────────────────────
 
 class MessageRequest(BaseModel):
@@ -172,6 +188,13 @@ async def health() -> Dict:
 
 @app.post("/invoke/message")
 async def invoke_message(body: MessageRequest) -> Dict:
+    # Look for matching workflow definitions
+    definitions = await get_workflow_definitions(body.tenantId)
+    # Simple matching logic: for now just take the first one or default to generic agent
+    # In a real app, we'd use LLM to decide which workflow to trigger
+
+    active_wf_def = next((d for d in definitions if d["trigger"]["type"] == "message"), None)
+
     workflow_id = str(uuid.uuid4())
 
     initial_state: AgentState = {
@@ -195,7 +218,7 @@ async def invoke_message(body: MessageRequest) -> Dict:
     # Store workflow state
     _workflows[workflow_id] = {
         "workflow_id": workflow_id,
-        "name": f"Message: {body.content[:30]}...",
+        "name": active_wf_def["name"] if active_wf_def else f"Message: {body.content[:30]}...",
         "current_state": result["status"],
         "progress": result["progress"],
         "history": result["history"],

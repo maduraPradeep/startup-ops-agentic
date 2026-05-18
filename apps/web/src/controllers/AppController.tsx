@@ -7,7 +7,10 @@ import { RecentEntitiesController } from './RecentEntitiesController';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
-interface Props { children: React.ReactNode }
+interface Props {
+  children: React.ReactNode;
+  onNavigateWorkflowBuilder?: () => void;
+}
 
 function resolveSidebarContent(panel: SidebarPanel) {
   switch (panel) {
@@ -19,7 +22,7 @@ function resolveSidebarContent(panel: SidebarPanel) {
   }
 }
 
-export function AppController({ children }: Props) {
+export function AppController({ children, onNavigateWorkflowBuilder }: Props) {
   const {
     activePanel, isCollapsed, pendingApprovalCount,
     setActivePanel, toggleCollapse, setPendingCount,
@@ -37,6 +40,7 @@ export function AppController({ children }: Props) {
       user={user}
       sidebarContent={resolveSidebarContent(activePanel)}
       onPanelChange={setActivePanel}
+      onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}
       onToggleCollapse={toggleCollapse}
       onSignOut={clearAuth}
     >
