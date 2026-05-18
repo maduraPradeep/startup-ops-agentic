@@ -12,7 +12,6 @@ interface Props {
   onSend: (content: string) => void;
   connectionStatus?: ConnectionStatus;
   sendMessage?: (conversationId: string, content: string) => void;
-  conversationId?: string | null;
 }
 
 function ConnectionBanner({ status }: { status: ConnectionStatus }) {
@@ -45,7 +44,6 @@ export function ChatSurface({
   onSend,
   connectionStatus,
   sendMessage,
-  conversationId,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -70,11 +68,7 @@ export function ChatSurface({
           <MessageBubble
             key={msg.id ?? i}
             message={msg}
-            sendMessage={
-              sendMessage && conversationId
-                ? (content) => sendMessage(conversationId, content)
-                : undefined
-            }
+            sendMessage={sendMessage}
           />
         ))}
         {isTyping && (

@@ -19,7 +19,6 @@ export function ChatController() {
       onSend={handleSend}
       connectionStatus={connectionStatus}
       sendMessage={sendMessage}
-      conversationId={conversationId}
     />
   );
 }
