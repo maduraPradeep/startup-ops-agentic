@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getEntitySchema } from '@ops/shared';
 import { EntityModel } from '../models/entity.model.js';
 import { WorkflowModel } from '../models/workflow.model.js';
+import { logAudit } from '../services/audit.service.js';
 
 export function createEntityController(fastify: FastifyInstance) {
   return {
@@ -50,6 +51,16 @@ export function createEntityController(fastify: FastifyInstance) {
         JSON.stringify({ tenantId: request.tenantId, item, actor: request.user })
       );
 
+      await logAudit({
+        tenant_id:   request.tenantId,
+        actor_id:    request.user.userId,
+        actor_email: request.user.email,
+        action:      'create',
+        collection,
+        item_id:     (item as Record<string, unknown>)?.id as string | undefined,
+        changes:     request.body,
+      });
+
       return reply.status(201).send({ success: true, data: item });
     },
 
@@ -62,6 +73,16 @@ export function createEntityController(fastify: FastifyInstance) {
         `entity:${collection}:updated`,
         JSON.stringify({ tenantId: request.tenantId, item, actor: request.user })
       );
+
+      await logAudit({
+        tenant_id:   request.tenantId,
+        actor_id:    request.user.userId,
+        actor_email: request.user.email,
+        action:      'update',
+        collection,
+        item_id:     id,
+        changes:     request.body,
+      });
 
       return reply.send({ success: true, data: item });
     },
@@ -78,6 +99,17 @@ export function createEntityController(fastify: FastifyInstance) {
         payload: request.body,
         actor: request.user,
         tenantId: request.tenantId,
+      });
+
+      await logAudit({
+        tenant_id:   request.tenantId,
+        actor_id:    request.user.userId,
+        actor_email: request.user.email,
+        action:      `executeAction:${action}`,
+        collection,
+        item_id:     id,
+        changes:     request.body,
+        metadata:    { result },
       });
 
       return reply.send({ success: true, data: result });

@@ -13,8 +13,9 @@ interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: AuthUser, token: string) => void;
+  setAuth: (user: AuthUser, token: string, refreshToken?: string) => void;
   clearAuth: () => void;
 }
 
@@ -24,9 +25,12 @@ export const useAuthStore = create<AuthState>()(
       (set) => ({
         user: null,
         token: null,
+        refreshToken: null,
         isAuthenticated: false,
-        setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
-        clearAuth: () => set({ user: null, token: null, isAuthenticated: false }),
+        setAuth: (user, token, refreshToken = null) =>
+          set({ user, token, refreshToken, isAuthenticated: true }),
+        clearAuth: () =>
+          set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
       }),
       {
         name: 'ops-auth',
@@ -34,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
         partialize: (state) => ({
           user:            state.user,
           token:           state.token,
+          refreshToken:    state.refreshToken,
           isAuthenticated: state.isAuthenticated,
         }),
       }

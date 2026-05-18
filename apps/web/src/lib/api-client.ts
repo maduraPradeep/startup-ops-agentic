@@ -7,14 +7,14 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
-async function request<T>(
+// Internal fetch helper — no refresh logic, used for the refresh call itself
+async function rawRequest(
   method: string,
   path: string,
   body?: unknown,
+  token?: string | null,
   options?: RequestOptions
-): Promise<T> {
-  const { token } = useAuthStore.getState();
-
+): Promise<Response> {
   const url = new URL(`${BASE_URL}${path}`);
   if (options?.params) {
     Object.entries(options.params).forEach(([k, v]) => {
@@ -22,7 +22,7 @@ async function request<T>(
     });
   }
 
-  const response = await fetch(url.toString(), {
+  return fetch(url.toString(), {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -31,6 +31,44 @@ async function request<T>(
     body: body ? JSON.stringify(body) : undefined,
     signal: options?.signal,
   });
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options?: RequestOptions
+): Promise<T> {
+  const { token } = useAuthStore.getState();
+
+  let response = await rawRequest(method, path, body, token, options);
+
+  // Attempt token refresh on 401 (only once to avoid infinite loops)
+  if (response.status === 401) {
+    const { refreshToken, setAuth, clearAuth } = useAuthStore.getState();
+
+    if (refreshToken) {
+      try {
+        const refreshResponse = await rawRequest('POST', '/auth/refresh', { refreshToken });
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json() as {
+            token: string;
+            refreshToken: string;
+            user: Parameters<typeof setAuth>[0];
+          };
+          setAuth(data.user, data.token, data.refreshToken);
+          // Retry original request with new token
+          response = await rawRequest(method, path, body, data.token, options);
+        } else {
+          clearAuth();
+        }
+      } catch {
+        clearAuth();
+      }
+    } else {
+      clearAuth();
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));

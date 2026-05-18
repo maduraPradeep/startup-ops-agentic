@@ -9,6 +9,7 @@ interface ConversationState {
   activeAgents: string[];
   setConversationId: (id: string) => void;
   appendMessage: (message: Message) => void;
+  setMessages: (messages: Message[]) => void;
   setTyping: (agent: string, typing: boolean) => void;
   clearConversation: () => void;
 }
@@ -25,6 +26,8 @@ export const useConversationStore = create<ConversationState>()(
 
       appendMessage: (message) =>
         set((state) => ({ messages: [...state.messages, message] })),
+
+      setMessages: (messages) => set({ messages }),
 
       setTyping: (agent, typing) =>
         set((state) => ({

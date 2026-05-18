@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { ApprovalModel } from '../models/approval.model.js';
+import { logAudit } from '../services/audit.service.js';
 
 export function createApprovalController(fastify: FastifyInstance) {
   return {
@@ -22,6 +23,17 @@ export function createApprovalController(fastify: FastifyInstance) {
       );
 
       fastify.io.to(`tenant:${request.tenantId}`).emit('approval:decided', { id, decision });
+
+      await logAudit({
+        tenant_id:   request.tenantId,
+        actor_id:    request.user.userId,
+        actor_email: request.user.email,
+        action:      'decide',
+        collection:  'approvals',
+        item_id:     id,
+        changes:     request.body,
+        metadata:    { decision, notes },
+      });
 
       return reply.send({ success: true, data: updated });
     },
