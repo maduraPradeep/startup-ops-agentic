@@ -64,7 +64,8 @@ export function WorkflowBuilderPage({ onBack }: Props) {
                 <GitBranch className="text-indigo-600" />
                 Workflow Builder
               </h1>
-            <p className="text-gray-500">Design automated workflows for your organization</p>
+              <p className="text-gray-500">Design automated workflows for your organization</p>
+            </div>
           </div>
           <button
             onClick={handleSave}
