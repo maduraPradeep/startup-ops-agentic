@@ -24,7 +24,6 @@ export function WorkflowBuilderPage({ onBack }: Props) {
       queryClient.invalidateQueries({ queryKey: ['workflow_definitions'] });
       setIsSuccess(true);
       setTimeout(() => setIsSuccess(false), 3000);
-      // Reset form
       setName('');
       setDescription('');
       setPrompt('');
@@ -76,6 +75,12 @@ export function WorkflowBuilderPage({ onBack }: Props) {
             {createWorkflow.isPending ? 'Saving...' : isSuccess ? 'Saved!' : 'Save Workflow'}
           </button>
         </header>
+
+        {createWorkflow.isError && (
+          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            Failed to save workflow: {(createWorkflow.error as any)?.message ?? 'Unknown error'}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">

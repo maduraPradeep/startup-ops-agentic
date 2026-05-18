@@ -16,7 +16,7 @@ export function ChatPage({ onNavigateWorkflowBuilder }: Props) {
   }, [conversationId, setConversationId]);
 
   return (
-    <AppController>
+    <AppController onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}>
       <ChatController />
     </AppController>
   );
