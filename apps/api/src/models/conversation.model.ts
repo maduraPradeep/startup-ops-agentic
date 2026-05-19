@@ -9,6 +9,26 @@ export const ConversationModel = {
     });
   },
 
+  async findMessages(conversationId: string) {
+    return directus.readItems('conversation_messages', {
+      filter: { conversation_id: { _eq: conversationId } },
+      sort:   ['created_at'],
+    });
+  },
+
+  async saveMessage(params: {
+    conversation_id: string;
+    tenant_id: string;
+    role: 'human' | 'agent';
+    content: string;
+    metadata?: unknown;
+  }): Promise<void> {
+    await directus.createItem('conversation_messages', {
+      ...params,
+      created_at: new Date().toISOString(),
+    });
+  },
+
   async sendToAgent(params: {
     conversationId: string;
     content: string;

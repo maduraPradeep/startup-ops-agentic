@@ -4,7 +4,7 @@ import { ChatSurface } from '../views/chat/ChatSurface';
 
 export function ChatController() {
   const { messages, isTyping, activeAgents, conversationId } = useConversationStore();
-  const { sendMessage } = useConversationSocket();
+  const { sendMessage, connectionStatus } = useConversationSocket();
 
   const handleSend = (content: string) => {
     if (conversationId) sendMessage(conversationId, content);
@@ -15,8 +15,10 @@ export function ChatController() {
       messages={messages}
       isTyping={isTyping}
       activeAgents={activeAgents}
-      disabled={!conversationId}
+      disabled={!conversationId || connectionStatus !== 'connected'}
       onSend={handleSend}
+      connectionStatus={connectionStatus}
+      sendMessage={sendMessage}
     />
   );
 }

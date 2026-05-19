@@ -9,3 +9,8 @@ coverage/
 .gitnexus
 services/langgraph/.venv/
 .dev-seeded
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

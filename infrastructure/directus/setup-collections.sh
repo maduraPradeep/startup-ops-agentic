@@ -29,6 +29,25 @@ echo "Registering collections..."
 
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-docker-postgres-1}"
 
+# ── 0. Ensure tables exist (safe for existing volumes) ────────────────────────
+echo "Ensuring tables exist..."
+docker exec "$POSTGRES_CONTAINER" psql -U ops_user -d ops_platform -c "
+CREATE TABLE IF NOT EXISTS workflow_definitions (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        VARCHAR(200) NOT NULL,
+  description TEXT,
+  trigger     JSONB NOT NULL,
+  prompt      TEXT NOT NULL,
+  entities    JSONB DEFAULT '[]',
+  output      JSONB NOT NULL,
+  status      VARCHAR(50) DEFAULT 'active',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_definitions_tenant ON workflow_definitions(tenant_id);
+"
+
 docker exec "$POSTGRES_CONTAINER" psql -U ops_user -d ops_platform -c "
 INSERT INTO directus_collections (collection, icon, note, sort, accountability, collapse)
 VALUES
@@ -41,7 +60,8 @@ VALUES
   ('documents',      'description',     NULL,                              7,  'all', 'open'),
   ('approval_chains','approval',        NULL,                              8,  'all', 'open'),
   ('audit_logs',     'history',         NULL,                              9,  'all', 'open'),
-  ('conversations',  'chat',            NULL,                              10, 'all', 'open')
+  ('conversations',  'chat',            NULL,                              10, 'all', 'open'),
+  ('workflow_definitions', 'git_branch', NULL,                             11, 'all', 'open')
 ON CONFLICT (collection) DO NOTHING;
 "
 
@@ -63,7 +83,8 @@ VALUES
   ('documents',      'tenant_id',   'tenants',        'nullify'),
   ('documents',      'created_by',  'employees',      'nullify'),
   ('audit_logs',     'tenant_id',   'tenants',        'nullify'),
-  ('conversations',  'tenant_id',   'tenants',        'nullify')
+  ('conversations',  'tenant_id',   'tenants',        'nullify'),
+  ('workflow_definitions', 'tenant_id', 'tenants',     'nullify')
 ON CONFLICT DO NOTHING;
 "
 
@@ -135,5 +156,14 @@ patch_field audit_logs tenant_id '{"meta":{"hidden":true}}'
 # conversations
 patch_field conversations tenant_id '{"meta":{"hidden":true}}'
 patch_field conversations updated_at '{"meta":{"hidden":true,"readonly":true}}'
+
+# workflow_definitions
+patch_field workflow_definitions tenant_id '{"meta":{"hidden":true}}'
+patch_field workflow_definitions trigger   '{"meta":{"interface":"input-code","options":{"language":"json"}}}'
+patch_field workflow_definitions entities  '{"meta":{"interface":"tags"}}'
+patch_field workflow_definitions output    '{"meta":{"interface":"input-code","options":{"language":"json"}}}'
+patch_field workflow_definitions status    '{"meta":{"interface":"select-dropdown","options":{"choices":[{"text":"Active","value":"active"},{"text":"Inactive","value":"inactive"}]}}}'
+patch_field workflow_definitions created_at '{"meta":{"hidden":true,"readonly":true}}'
+patch_field workflow_definitions updated_at '{"meta":{"hidden":true,"readonly":true}}'
 
 echo "Done. Open http://localhost:8055 — all collections should now be visible."

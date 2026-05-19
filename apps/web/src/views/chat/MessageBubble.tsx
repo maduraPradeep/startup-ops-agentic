@@ -3,9 +3,12 @@ import { format } from 'date-fns';
 import type { Message } from '@ops/shared';
 import { WorkflowStatusController } from '../../controllers/WorkflowStatusController';
 import { ApprovalController } from '../../controllers/ApprovalController';
+import { ActionCard } from '../cards/ActionCard';
+import { BroadcastCard } from '../cards/BroadcastCard';
 
 interface Props {
   message: Message;
+  sendMessage?: (conversationId: string, content: string) => void;
 }
 
 const AGENT_COLORS: Record<string, string> = {
@@ -18,7 +21,7 @@ const AGENT_COLORS: Record<string, string> = {
   notification: 'bg-gray-100 text-gray-800',
 };
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, sendMessage }: Props) {
   const isHuman  = message.sender.type === 'human';
   const timestamp = message.timestamp ? format(new Date(message.timestamp), 'HH:mm') : '';
 
@@ -53,6 +56,19 @@ export function MessageBubble({ message }: Props) {
 
         {message.payload?.type === 'approval' && (
           <ApprovalController action={message.payload.approval as any} />
+        )}
+
+        {message.payload?.type === 'action_card' && (
+          <ActionCard
+            title={(message.payload as any).title ?? ''}
+            description={(message.payload as any).description}
+            actions={(message.payload as any).actions ?? []}
+            onSelect={(value) => sendMessage?.(message.conversationId, value)}
+          />
+        )}
+
+        {message.payload?.type === 'broadcast' && (
+          <BroadcastCard broadcast={(message.payload as any).broadcast} />
         )}
 
         {timestamp && (

@@ -10,13 +10,46 @@ export function createConversationController(fastify: FastifyInstance) {
       return reply.send({ success: true, data });
     },
 
-    handleWebSocket(socket: WebSocket, request: FastifyRequest) {
+    async handleWebSocket(socket: WebSocket, request: FastifyRequest) {
       const tenantId = request.tenantId;
       const user     = request.user;
 
+      // Send existing conversation history to the client
+      const conversationId = (request.query as Record<string, string>).conversationId;
+      if (conversationId) {
+        try {
+          const messages = await ConversationModel.findMessages(conversationId);
+          socket.send(JSON.stringify({ type: 'history', data: messages }));
+        } catch (err) {
+          fastify.log.error(err, 'Failed to load conversation history');
+        }
+      }
+
       socket.on('message', async (raw: Buffer) => {
         try {
-          const message = MessageSchema.parse(JSON.parse(raw.toString()));
+          const parsed = JSON.parse(raw.toString());
+
+          if (parsed.type === 'load_history') {
+            const convId = parsed.conversationId as string | undefined;
+            if (convId) {
+              const messages = await ConversationModel.findMessages(convId);
+              socket.send(JSON.stringify({ type: 'history', data: messages }));
+            }
+            return;
+          }
+
+          const message = MessageSchema.parse(parsed);
+
+          // Persist human message
+          await ConversationModel.saveMessage({
+            conversation_id: message.conversationId,
+            tenant_id:       tenantId,
+            role:            'human',
+            content:         message.content,
+          });
+
+          // Notify client that agent is typing
+          socket.send(JSON.stringify({ type: 'agent:typing', data: { agent: 'orchestrator', typing: true } }));
 
           const response = await ConversationModel.sendToAgent({
             conversationId: message.conversationId,
@@ -24,6 +57,23 @@ export function createConversationController(fastify: FastifyInstance) {
             channel:        'webchat',
             tenantId,
             actor:          user,
+          });
+
+          // Notify client that agent has stopped typing
+          socket.send(JSON.stringify({ type: 'agent:typing', data: { agent: 'orchestrator', typing: false } }));
+
+          // Persist agent response
+          const responseContent =
+            typeof response === 'object' && response !== null && 'content' in response
+              ? String((response as Record<string, unknown>).content)
+              : JSON.stringify(response);
+
+          await ConversationModel.saveMessage({
+            conversation_id: message.conversationId,
+            tenant_id:       tenantId,
+            role:            'agent',
+            content:         responseContent,
+            metadata:        response,
           });
 
           socket.send(JSON.stringify({ type: 'message', data: response }));
@@ -38,22 +88,6 @@ export function createConversationController(fastify: FastifyInstance) {
       );
       subscriber.on('message', (_ch: string, msg: string) => socket.send(msg));
       socket.on('close', () => { subscriber.unsubscribe(); subscriber.quit(); });
-    },
-
-    async streamSSE(request: FastifyRequest, reply: FastifyReply) {
-      const { conversationId } = request.params as { conversationId: string };
-
-      reply.raw.setHeader('Content-Type',  'text/event-stream');
-      reply.raw.setHeader('Cache-Control', 'no-cache');
-      reply.raw.setHeader('Connection',    'keep-alive');
-
-      const subscriber = fastify.redis.duplicate();
-      await subscriber.subscribe(`conversation:${conversationId}`);
-      subscriber.on('message', (_ch: string, data: string) =>
-        reply.raw.write(`data: ${data}\n\n`)
-      );
-
-      request.raw.on('close', () => { subscriber.unsubscribe(); subscriber.quit(); });
     },
   };
 }
