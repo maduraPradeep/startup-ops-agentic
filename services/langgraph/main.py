@@ -240,12 +240,12 @@ def _check_policy_rules(
     notes = []
 
     for policy in policies:
-        # Check max_days
-        max_days = policy.get("max_days")
-        requested_days = payload.get("days") or payload.get("duration_days")
+        # Check max_days_per_year (column name in schema)
+        max_days = policy.get("max_days_per_year") or policy.get("max_days")
+        requested_days = payload.get("days_requested") or payload.get("days") or payload.get("duration_days")
         if max_days is not None and requested_days is not None:
             try:
-                if int(requested_days) > int(max_days):
+                if float(requested_days) > int(max_days):
                     return {
                         "valid": False,
                         "notes": f"Request exceeds maximum allowed days ({max_days})."
@@ -269,8 +269,8 @@ def _check_policy_rules(
                     "notes": f"Request falls on a blackout date: {bd}."
                 }
 
-        # Check min_days_notice
-        min_notice = policy.get("min_days_notice")
+        # Check notice_days_required (column name in schema)
+        min_notice = policy.get("notice_days_required") or policy.get("min_days_notice")
         if min_notice is not None and start_date:
             try:
                 from datetime import date
