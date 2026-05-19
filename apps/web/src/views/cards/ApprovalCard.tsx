@@ -14,9 +14,10 @@ interface Props {
   isPending: boolean;
   onApprove: (id: string) => void;
   onReject:  (id: string) => void;
+  onModify?: (id: string) => void;
 }
 
-export function ApprovalCard({ action, isPending, onApprove, onReject }: Props) {
+export function ApprovalCard({ action, isPending, onApprove, onReject, onModify }: Props) {
   return (
     <div className="border-l-4 border-amber-400 bg-amber-50 rounded-xl p-4 max-w-sm">
       <div className="flex items-center gap-2 mb-2">
@@ -44,7 +45,11 @@ export function ApprovalCard({ action, isPending, onApprove, onReject }: Props) 
         >
           ❌ Reject
         </button>
-        <button className="flex-1 text-sm border border-gray-300 text-gray-600 rounded-lg py-1.5 hover:bg-gray-50">
+        <button
+          onClick={() => onModify?.(action.id)}
+          disabled={isPending}
+          className="flex-1 text-sm border border-gray-300 text-gray-600 rounded-lg py-1.5 hover:bg-gray-50 disabled:opacity-50"
+        >
           ✏️ Modify
         </button>
         <button

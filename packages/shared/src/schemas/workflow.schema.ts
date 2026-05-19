@@ -28,3 +28,34 @@ export const WorkflowSchema = z.object({
 });
 
 export type Workflow = z.infer<typeof WorkflowSchema>;
+
+export const WorkflowTriggerSchema = z.object({
+  type: z.enum(['message', 'event', 'schedule']),
+  config: z.record(z.unknown()),
+});
+
+export const WorkflowOutputSchema = z.object({
+  type: z.enum(['message', 'task', 'notification']),
+  config: z.record(z.unknown()),
+});
+
+export const WorkflowDefinitionSchema = z.object({
+  id: z.string().uuid().optional(),
+  tenant_id: z.string().uuid().optional(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  trigger: WorkflowTriggerSchema,
+  prompt: z.string().min(1),
+  entities: z.array(z.string()).default([]),
+  output: WorkflowOutputSchema,
+  status: z.enum(['active', 'inactive']).default('active'),
+  created_at: z.coerce.date().optional(),
+  updated_at: z.coerce.date().optional(),
+});
+
+export const CreateWorkflowDefinitionSchema = WorkflowDefinitionSchema.omit({
+  id: true, tenant_id: true, created_at: true, updated_at: true,
+});
+
+export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+export type CreateWorkflowDefinition = z.infer<typeof CreateWorkflowDefinitionSchema>;

@@ -37,6 +37,43 @@ export function useCreateLeaveRequest() {
   });
 }
 
+export function useRejectLeaveRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
+      apiClient.post(`/entities/leave_requests/${id}/rejectRequest`, { approval_notes: notes }),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEY, id] });
+      const previous = queryClient.getQueryData([QUERY_KEY, id]);
+      queryClient.setQueryData([QUERY_KEY, id], (old: { data: LeaveRequest } | undefined) =>
+        old ? { ...old, data: { ...old.data, status: 'rejected' } } : old
+      );
+      return { previous };
+    },
+    onError: (_err, { id }, context) => {
+      queryClient.setQueryData([QUERY_KEY, id], context?.previous);
+    },
+    onSettled: (_data, _err, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, id] });
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
+}
+
+export function useUpdateLeaveRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateLeaveRequest> }) =>
+      apiClient.patch<{ data: LeaveRequest }>(`/entities/leave_requests/${id}`, data),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      if (res.data.id) {
+        queryClient.setQueryData([QUERY_KEY, res.data.id], res);
+      }
+    },
+  });
+}
+
 export function useApproveLeaveRequest() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -4,7 +4,12 @@ import { AppController } from '../controllers/AppController';
 import { ChatController } from '../controllers/ChatController';
 import { useConversationStore } from '../stores/conversation.store';
 
-export function ChatPage() {
+interface Props {
+  onNavigateWorkflowBuilder?: () => void;
+  onNavigateAdmin?: () => void;
+}
+
+export function ChatPage({ onNavigateWorkflowBuilder, onNavigateAdmin }: Props) {
   const { conversationId, setConversationId } = useConversationStore();
 
   useEffect(() => {
@@ -12,7 +17,10 @@ export function ChatPage() {
   }, [conversationId, setConversationId]);
 
   return (
-    <AppController>
+    <AppController
+      onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}
+      onNavigateAdmin={onNavigateAdmin}
+    >
       <ChatController />
     </AppController>
   );
