@@ -23,6 +23,7 @@ interface Notification {
 interface Props {
   children: React.ReactNode;
   onNavigateWorkflowBuilder?: () => void;
+  onNavigateAdmin?: () => void;
 }
 
 function NotificationsPanel() {
@@ -239,7 +240,7 @@ function resolveSidebarContent(panel: SidebarPanel) {
   }
 }
 
-export function AppController({ children, onNavigateWorkflowBuilder }: Props) {
+export function AppController({ children, onNavigateWorkflowBuilder, onNavigateAdmin }: Props) {
   const {
     activePanel, isCollapsed, pendingApprovalCount,
     setActivePanel, toggleCollapse, setPendingCount,
@@ -258,6 +259,7 @@ export function AppController({ children, onNavigateWorkflowBuilder }: Props) {
       sidebarContent={resolveSidebarContent(activePanel)}
       onPanelChange={setActivePanel}
       onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}
+      onNavigateAdmin={onNavigateAdmin}
       onToggleCollapse={toggleCollapse}
       onSignOut={clearAuth}
     >

@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut, Plus } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut, Plus, Database } from 'lucide-react';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
@@ -18,6 +18,7 @@ interface Props {
   sidebarContent: React.ReactNode;
   onPanelChange: (panel: SidebarPanel) => void;
   onNavigateWorkflowBuilder?: () => void;
+  onNavigateAdmin?: () => void;
   onToggleCollapse: () => void;
   onSignOut: () => void;
   children: React.ReactNode;
@@ -31,6 +32,7 @@ export function AppLayout({
   sidebarContent,
   onPanelChange,
   onNavigateWorkflowBuilder,
+  onNavigateAdmin,
   onToggleCollapse,
   onSignOut,
   children,
@@ -75,6 +77,15 @@ export function AppLayout({
               )}
             </button>
           ))}
+          {onNavigateAdmin && (
+            <button
+              onClick={onNavigateAdmin}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-gray-600 hover:bg-gray-50"
+            >
+              <span className="shrink-0"><Database size={18} /></span>
+              {!isCollapsed && <span className="truncate">Data Admin</span>}
+            </button>
+          )}
         </nav>
 
         {!isCollapsed && activePanel && (

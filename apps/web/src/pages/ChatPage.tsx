@@ -6,9 +6,10 @@ import { useConversationStore } from '../stores/conversation.store';
 
 interface Props {
   onNavigateWorkflowBuilder?: () => void;
+  onNavigateAdmin?: () => void;
 }
 
-export function ChatPage({ onNavigateWorkflowBuilder }: Props) {
+export function ChatPage({ onNavigateWorkflowBuilder, onNavigateAdmin }: Props) {
   const { conversationId, setConversationId } = useConversationStore();
 
   useEffect(() => {
@@ -16,7 +17,10 @@ export function ChatPage({ onNavigateWorkflowBuilder }: Props) {
   }, [conversationId, setConversationId]);
 
   return (
-    <AppController onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}>
+    <AppController
+      onNavigateWorkflowBuilder={onNavigateWorkflowBuilder}
+      onNavigateAdmin={onNavigateAdmin}
+    >
       <ChatController />
     </AppController>
   );
