@@ -15,7 +15,7 @@ export function ChatController() {
       messages={messages}
       isTyping={isTyping}
       activeAgents={activeAgents}
-      disabled={!conversationId}
+      disabled={!conversationId || connectionStatus !== 'connected'}
       onSend={handleSend}
       connectionStatus={connectionStatus}
       sendMessage={sendMessage}

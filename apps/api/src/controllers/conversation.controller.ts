@@ -27,7 +27,18 @@ export function createConversationController(fastify: FastifyInstance) {
 
       socket.on('message', async (raw: Buffer) => {
         try {
-          const message = MessageSchema.parse(JSON.parse(raw.toString()));
+          const parsed = JSON.parse(raw.toString());
+
+          if (parsed.type === 'load_history') {
+            const convId = parsed.conversationId as string | undefined;
+            if (convId) {
+              const messages = await ConversationModel.findMessages(convId);
+              socket.send(JSON.stringify({ type: 'history', data: messages }));
+            }
+            return;
+          }
+
+          const message = MessageSchema.parse(parsed);
 
           // Persist human message
           await ConversationModel.saveMessage({
