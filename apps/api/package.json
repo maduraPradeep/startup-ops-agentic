@@ -23,6 +23,7 @@
     "@ops/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.0",
     "dotenv": "^17.4.2",
+    "fast-jwt": "6.2.4",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.0",
     "ioredis": "^5.4.1",

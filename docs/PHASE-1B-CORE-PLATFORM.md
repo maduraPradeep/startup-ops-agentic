@@ -60,8 +60,15 @@ Status legend: ✅ done · 🟡 partial · ⬜ not started. The **backend compil
    `SchemaRegistryService`, `RedisCacheStore`)*
 5. ✅ **`/describe` endpoint** merging platform (Tier 1) + tenant (Tier 2) fields.
    *(`GET /api/v1/admin/schema/:entity` → `SchemaRegistryService.describe`)*
-6. 🟡 **Auth** — JWT verify + RBAC preHandler exist on the legacy `@fastify/jwt` path; the
-   GoTrue/Redis-`jti`-denylist migration is **deferred** (chosen out of this slice's scope).
+6. ✅ **Auth** — Supabase GoTrue JWT verification + Redis `jti` denylist. The gateway verifies
+   GoTrue-issued HS256 access tokens locally with `SUPABASE_JWT_SECRET` (claims mapped from
+   `app_metadata`), and falls back to the legacy `@fastify/jwt` (`JWT_SECRET`) path when that
+   secret is unset so dev/CI + the Directus login bridge keep working. Redis owns revocation
+   (GoTrue has none): `POST /api/v1/auth/logout` denylists the token's revocation key
+   (`jti` if present, else GoTrue `session_id`) with TTL = remaining lifetime; the shared
+   `verifyBearer` enforces it on **both HTTP and WS connect** (spec §11.1). App-layer
+   `authorize()` RBAC unchanged. Degrades gracefully (in-memory denylist when Redis absent).
+   See `PHASE-1B-AUTH-SLICE-SUMMARY.md`.
 7. 🟡 **Schema Builder API + UI** — API done (`SchemaBuilderService`, 409-conflict + PUT,
    `POST/PUT /api/v1/admin/schema/:entity/fields`); **UI deferred**.
 8. ⬜ **Skill Editor UI** (token autocomplete, compile button, visual validation panel).

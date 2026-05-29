@@ -54,5 +54,20 @@ export function createAuthController(fastify: FastifyInstance) {
       if (!data) return reply.status(401).send({ error: 'Token refresh failed' });
       return reply.send(data);
     },
+
+    // Revoke the current token by adding its revocation key (jti / session_id, see
+    // supabase-jwt.ts) to the Redis-backed denylist with TTL = remaining token lifetime, so it
+    // self-cleans at expiry. Rejected on the next HTTP request AND on WS connect (spec §11.1).
+    // GoTrue itself has no per-token denylist — this is the platform's revocation primitive.
+    async logout(request: FastifyRequest, reply: FastifyReply) {
+      const key = request.revocationKey;
+      if (!key) return reply.status(401).send({ error: 'Unauthorized' });
+      // Fall back to a short TTL when the token carried no exp (legacy dev tokens may omit it).
+      const ttl = request.revocationTtlSeconds && request.revocationTtlSeconds > 0
+        ? request.revocationTtlSeconds
+        : 3600;
+      await fastify.tokenDenylist.deny(key, ttl);
+      return reply.send({ revoked: true });
+    },
   };
 }
