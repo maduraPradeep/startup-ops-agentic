@@ -9,3 +9,5 @@ coverage/
 .gitnexus
 services/langgraph/.venv/
 .dev-seeded
+supabase/.branches/
+supabase/.temp/
