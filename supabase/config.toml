@@ -1,0 +1,42 @@
+# Phase 1b — Supabase local dev config (managed Postgres + Auth + Studio).
+# See docs/PHASE-1B-CORE-PLATFORM.md "Persistence decision". Supabase is adopted as
+# managed Postgres / Auth / Studio only — the Fastify gateway and Python LangGraph
+# runtime remain the architecture. No client-direct PostgREST writes for entities or
+# skills; everything flows through Fastify.
+#
+# Local dev: `supabase start` boots Postgres + Studio + GoTrue. Migrations in
+# supabase/migrations/ are applied via `supabase db reset` / `supabase db push`, then
+# supabase/seed.sql loads the Phase 1a platform-config fixtures.
+
+project_id = "startup-ops-agentic"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 16
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+# GoTrue issues JWTs; Redis (not configured here) owns jti revocation + rate limiting.
+enabled = true
+site_url = "http://localhost:3000"
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

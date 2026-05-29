@@ -35,3 +35,11 @@ export {
   HRIS_SYNC_NO_HITL_DEFINITION,
   HRIS_SYNC_WITH_HITL_DEFINITION,
 } from './llm/fixtures';
+
+// Skill-text fixtures (shared with the Phase 1b registry-parity suite).
+export {
+  ADD_EMPLOYEE_SKILL,
+  HRIS_SYNC_SKILL,
+  UNKNOWN_ENTITY_SKILL,
+  UNKNOWN_KIND_SKILL,
+} from './llm/skill-fixtures';
