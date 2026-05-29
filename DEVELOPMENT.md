@@ -156,6 +156,42 @@ cd services/langgraph && source .venv/bin/activate && uvicorn main:app --reload 
 
 ---
 
+## Phase 1a — Skill compilation vertical slice
+
+The compilation spike (skill text → compiled LangGraph → execution) is implemented and fully
+mock-tested — **no Docker, Directus, Postgres, Redis, or LLM key required**. See `TASKS.md`
+for the full task list and acceptance criteria.
+
+- `packages/shared` — the contract: token types, LangGraph IR, `ExecutionState`, registry &
+  compilation result schemas.
+- `packages/compiler` (`@ops/compiler`) — the 9-stage compiler: token parser/resolver,
+  content-hash cache, mock LLM + mock registry (Postgres stand-in; **not** Directus),
+  structural + data-flow + agent-scope validators, React Flow generator.
+- `services/langgraph/graph_builder` — Python `GraphBuilder.validate()` / `build_graph()` and
+  the `ExecutionRunner` (state transitions, human_input pause, in-memory checkpointer).
+
+Run the slice's tests:
+
+```bash
+# TypeScript
+pnpm install
+pnpm --filter @ops/shared test         # contract schemas
+pnpm --filter @ops/compiler test       # parser, cache, validators, e2e, round-trip
+
+# Python (GraphBuilder)
+cd services/langgraph
+python -m venv .venv && source .venv/bin/activate   # first run only
+pip install -r requirements.txt                     # includes pytest
+python -m pytest -v
+```
+
+The canonical "Add Employee" IR lives once in
+`packages/compiler/src/llm/fixtures/add-employee.langgraph.json` and is copied to
+`services/langgraph/graph_builder/fixtures/`; a TS test deep-equals the two so the
+cross-language round-trip cannot drift.
+
+---
+
 ## Service URLs
 
 | Service | URL |

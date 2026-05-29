@@ -1,0 +1,81 @@
+{
+  "name": "Add Employee",
+  "description": "Create a new employee record and start onboarding.",
+  "state_schema": {
+    "fields": {
+      "employee_data": { "type": "object", "description": "Collected employee fields" },
+      "linkedin_url": { "type": "string", "description": "LinkedIn profile URL" },
+      "linkedin_summary": { "type": "string", "description": "Summary produced by the LinkedIn analyzer" },
+      "employee_id": { "type": "string", "description": "Id of the created employee record" }
+    }
+  },
+  "entry_point": "load_schema",
+  "nodes": [
+    {
+      "id": "load_schema",
+      "step_type": "entity_tool",
+      "config": { "tokens": ["@tools:describe:people"], "entity": "people", "op": "describe" }
+    },
+    {
+      "id": "collect_details",
+      "step_type": "collect",
+      "config": { "tokens": ["@entity:people"], "entity": "people", "fields": ["name", "email", "role", "start_date"] }
+    },
+    {
+      "id": "ask_linkedin",
+      "step_type": "human_input",
+      "config": { "kind": "data", "prompt": "Please provide the LinkedIn URL", "output_field": "linkedin_url" }
+    },
+    {
+      "id": "analyze_linkedin",
+      "step_type": "enrich",
+      "config": {
+        "tokens": ["@tool:linkedin_analyzer", "@entity:people.linkedin_summary"],
+        "tool": "linkedin_analyzer",
+        "tool_inputs": ["linkedin_url"],
+        "output_field": "linkedin_summary"
+      }
+    },
+    {
+      "id": "create_employee",
+      "step_type": "entity_tool",
+      "config": {
+        "tokens": ["@tools:create:people"],
+        "entity": "people",
+        "op": "create",
+        "agent": "hr_bot",
+        "tool": "employees:create"
+      }
+    },
+    {
+      "id": "notify_owner",
+      "step_type": "notify",
+      "config": { "tokens": ["@role:owner"], "target": "owner" }
+    },
+    {
+      "id": "welcome_team",
+      "step_type": "notify",
+      "config": { "tokens": ["@role:all"], "target": "all" }
+    },
+    {
+      "id": "start_onboarding",
+      "step_type": "start_agent",
+      "config": { "tokens": ["@agent:onboarding"], "agent": "onboarding" }
+    },
+    {
+      "id": "complete",
+      "step_type": "end",
+      "config": {}
+    }
+  ],
+  "edges": [
+    { "from": "load_schema", "to": "collect_details" },
+    { "from": "collect_details", "to": "ask_linkedin" },
+    { "from": "ask_linkedin", "to": "analyze_linkedin" },
+    { "from": "analyze_linkedin", "to": "create_employee" },
+    { "from": "create_employee", "to": "notify_owner" },
+    { "from": "notify_owner", "to": "welcome_team" },
+    { "from": "welcome_team", "to": "start_onboarding" },
+    { "from": "start_onboarding", "to": "complete" }
+  ]
+}

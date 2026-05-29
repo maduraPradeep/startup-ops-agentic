@@ -18,3 +18,11 @@ export * from './leave-request.schema';
 export * from './project.schema';
 export * from './workflow.schema';
 export * from './conversation.schema';
+
+// Phase 1a — skill compilation contract
+export * from './tokens';
+export * from './langgraph-ir';
+export * from './execution';
+export * from './react-flow';
+export * from './registry';
+export * from './compilation';
