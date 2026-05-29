@@ -48,9 +48,13 @@ Status legend: ✅ done · 🟡 partial · ⬜ not started. The **backend compil
    (`supabase start`) replacing a bare `docker-compose` Postgres. *(foundation commit)*
 2. ✅ **Supabase-backed platform config** (replaces the mock registry as the canonical source).
    *(`PostgresRegistry` + migrations 001/seed)*
-3. ⬜ **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest, with
-   **RLS policies** on `tenant_id` as defense-in-depth. *(migrations 002/005 exist; entity
-   service/routes still on the legacy path)*
+3. 🟡 **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest, with
+   **RLS policies** on `tenant_id` as defense-in-depth. *(`EntityService` + `EntityStore`
+   (`PostgresEntityStore`/`InMemoryEntityStore`) now drive `/api/v1/entities/*` off the Postgres
+   path, registry-driven typed/extended split, app-layer tenant scoping; RLS from 005 is the net.
+   Covers the two registry-backed collections — `employees` (people) + `leave_requests`;
+   `departments`/`leave_policies` deferred until they have registry definitions. Legacy
+   Directus-backed `EntityModel` removed. See `PHASE-1B-ENTITY-SLICE-SUMMARY.md`.)*
 4. ✅ **`PostgresRegistry`** + Redis L2 cache (gzip, single-flight, 5-min TTL) behind the existing
    `Registry` interface, pointed at the Supabase connection string. *(`PostgresRegistry`,
    `SchemaRegistryService`, `RedisCacheStore`)*

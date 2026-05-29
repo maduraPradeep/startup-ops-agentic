@@ -11,6 +11,12 @@ import {
 } from '../services/tenant-field-store.js';
 import { SchemaRegistryService } from '../services/schema-registry.service.js';
 import { SchemaBuilderService } from '../services/schema-builder.service.js';
+import { EntityService } from '../services/entity.service.js';
+import {
+  PostgresEntityStore,
+  InMemoryEntityStore,
+  type EntityStore,
+} from '../services/entity-store.js';
 import { SkillCompilerService } from '../services/skill-compiler.service.js';
 import { ClaudeLLM } from '../services/claude-llm.js';
 import { PostgresCompilationStore } from '../services/compilation-store.js';
@@ -28,6 +34,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     schemaRegistry: SchemaRegistryService;
     schemaBuilder: SchemaBuilderService;
+    entities: EntityService;
     skillCompiler: SkillCompilerService | null;
   }
 }
@@ -37,12 +44,14 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
 
   let registry: Registry;
   let tenantFields: TenantFieldStore;
+  let entityStore: EntityStore;
   let compilationStore: PostgresCompilationStore | undefined;
 
   if (connectionString) {
     const client = new SupabaseClient({ connectionString });
     registry = await PostgresRegistry.create(client);
     tenantFields = new PostgresTenantFieldStore(client);
+    entityStore = new PostgresEntityStore(client);
     compilationStore = new PostgresCompilationStore(client);
     fastify.addHook('onClose', async () => {
       await client.close();
@@ -51,6 +60,7 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
   } else {
     registry = new MockRegistry();
     tenantFields = new InMemoryTenantFieldStore();
+    entityStore = new InMemoryEntityStore();
     fastify.log.warn('[platform] no DB configured — using MockRegistry + in-memory stores');
   }
 
@@ -60,6 +70,7 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
 
   const schemaRegistry = new SchemaRegistryService(registry, tenantFields, cache);
   const schemaBuilder = new SchemaBuilderService(registry, tenantFields, schemaRegistry);
+  const entities = new EntityService(schemaRegistry, entityStore);
 
   let skillCompiler: SkillCompilerService | null = null;
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -73,5 +84,6 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
 
   fastify.decorate('schemaRegistry', schemaRegistry);
   fastify.decorate('schemaBuilder', schemaBuilder);
+  fastify.decorate('entities', entities);
   fastify.decorate('skillCompiler', skillCompiler);
 });
