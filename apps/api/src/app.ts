@@ -10,6 +10,7 @@ import { directusPlugin } from './plugins/directus.plugin.js';
 import { redisPlugin } from './plugins/redis.plugin.js';
 import { tenantPlugin } from './plugins/tenant.plugin.js';
 import { websocketPlugin } from './plugins/websocket.plugin.js';
+import { platformPlugin } from './plugins/platform.plugin.js';
 
 import { conversationRoutes } from './routes/conversations/index.js';
 import { entityRoutes } from './routes/entities/index.js';
@@ -18,6 +19,8 @@ import { approvalRoutes } from './routes/approvals/index.js';
 import { broadcastRoutes } from './routes/broadcast/index.js';
 import { adminRoutes } from './routes/admin/index.js';
 import { authRoutes } from './routes/auth/index.js';
+import { skillRoutes } from './routes/skills/index.js';
+import { schemaRoutes } from './routes/schema/index.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -41,6 +44,7 @@ export async function buildApp() {
   await app.register(tenantPlugin);
   await app.register(websocket);
   await app.register(websocketPlugin);
+  await app.register(platformPlugin);
 
   await app.register(authRoutes,         { prefix: '/api/v1/auth' });
   await app.register(conversationRoutes, { prefix: '/api/v1/conversations' });
@@ -49,6 +53,8 @@ export async function buildApp() {
   await app.register(approvalRoutes,     { prefix: '/api/v1/approvals' });
   await app.register(broadcastRoutes,    { prefix: '/api/v1/broadcast' });
   await app.register(adminRoutes,        { prefix: '/api/v1/admin' });
+  await app.register(skillRoutes,        { prefix: '/api/v1/admin/skills' });
+  await app.register(schemaRoutes,       { prefix: '/api/v1/admin/schema' });
 
   app.setErrorHandler(async (error: any, _req, reply) => {
     app.log.error(error);

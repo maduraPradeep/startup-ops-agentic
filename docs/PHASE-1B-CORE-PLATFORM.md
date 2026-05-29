@@ -40,20 +40,31 @@ What Supabase gives us:
 
 ## Deliverables
 
-1. **Supabase project** (managed Postgres) provisioned; local dev via the Supabase CLI
-   (`supabase start`) replacing a bare `docker-compose` Postgres.
-2. **Supabase-backed platform config** (replaces the mock registry as the canonical source).
-3. **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest, with
-   **RLS policies** on `tenant_id` as defense-in-depth.
-4. **`PostgresRegistry`** + Redis L2 cache (gzip, single-flight, 5-min TTL) behind the existing
-   `Registry` interface, pointed at the Supabase connection string.
-5. **`/describe` endpoint** merging platform (Tier 1) + tenant (Tier 2) fields.
-6. **Auth** — Supabase Auth (GoTrue) issues JWTs; Fastify verifies them and enforces `jti`
-   revocation (Redis denylist) + RBAC via the `authorize()` preHandler.
-7. **Schema Builder API + UI** (tenant field extensions, 409-conflict resolution).
-8. **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
-9. **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
-10. **Supabase Studio** wired up as the internal admin surface for raw config/data inspection.
+Status legend: ✅ done · 🟡 partial · ⬜ not started. The **backend compile slice**
+(deliverables 4–9, backend portions) landed in `apps/api`; see
+`docs/PHASE-1B-COMPILE-SLICE-SUMMARY.md`.
+
+1. ✅ **Supabase project** (managed Postgres) provisioned; local dev via the Supabase CLI
+   (`supabase start`) replacing a bare `docker-compose` Postgres. *(foundation commit)*
+2. ✅ **Supabase-backed platform config** (replaces the mock registry as the canonical source).
+   *(`PostgresRegistry` + migrations 001/seed)*
+3. ⬜ **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest, with
+   **RLS policies** on `tenant_id` as defense-in-depth. *(migrations 002/005 exist; entity
+   service/routes still on the legacy path)*
+4. ✅ **`PostgresRegistry`** + Redis L2 cache (gzip, single-flight, 5-min TTL) behind the existing
+   `Registry` interface, pointed at the Supabase connection string. *(`PostgresRegistry`,
+   `SchemaRegistryService`, `RedisCacheStore`)*
+5. ✅ **`/describe` endpoint** merging platform (Tier 1) + tenant (Tier 2) fields.
+   *(`GET /api/v1/admin/schema/:entity` → `SchemaRegistryService.describe`)*
+6. 🟡 **Auth** — JWT verify + RBAC preHandler exist on the legacy `@fastify/jwt` path; the
+   GoTrue/Redis-`jti`-denylist migration is **deferred** (chosen out of this slice's scope).
+7. 🟡 **Schema Builder API + UI** — API done (`SchemaBuilderService`, 409-conflict + PUT,
+   `POST/PUT /api/v1/admin/schema/:entity/fields`); **UI deferred**.
+8. ⬜ **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
+   *(autocomplete backend done via `/admin/skills/tokens/resolve`)*
+9. ✅ **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
+   *(`SkillCompilerService` + `ClaudeLLM` + shared `CompilationCache` → `from_cache`)*
+10. ⬜ **Supabase Studio** wired up as the internal admin surface for raw config/data inspection.
 
 ---
 
