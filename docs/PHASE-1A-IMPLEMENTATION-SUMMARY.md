@@ -9,7 +9,7 @@
 ## 1. What was delivered
 
 A full vertical slice of the skill compilation + execution pipeline, with the LLM and **all**
-external infrastructure (Postgres, Redis, Directus, LLM API) mocked. It runs entirely in CI
+external infrastructure (Postgres, Redis, LLM API) mocked. It runs entirely in CI
 with no Docker, no services, and no API keys.
 
 ```
@@ -31,7 +31,7 @@ skill text
 
 | Decision | Rationale |
 |----------|-----------|
-| **No Directus.** Postgres is the canonical platform-config store (Phase 1b); a thin internal admin UI comes later. | Removes the spec's circuit-breaker / stale-cache / degraded-mode / `platform-field-guard` complexity, which existed only because Directus sat in the hot path of `/describe`. Reversible — everything reads through a `Registry` interface. |
+| **No Directus; Postgres via Supabase** is the canonical platform-config store (Phase 1b), with Supabase Studio as the internal admin UI. | Removes the spec's circuit-breaker / stale-cache / degraded-mode / `platform-field-guard` complexity, which existed only because Directus sat in the hot path of `/describe`. Supabase is just Postgres underneath, so it's reversible — everything reads through a `Registry` interface. (Firebase was rejected: NoSQL conflicts with the relational/JSONB/pgvector/`PostgresSaver` design.) |
 | **Compiler in its own package (`@ops/compiler`)**, not in `apps/api`. | Pure domain logic, no Fastify dependency, unit-testable in isolation. `apps/api` becomes a thin transport layer that depends on it. |
 | **IR `step_type` is a permissive string**, not a strict enum, in the Zod schema. | A bad step type from the LLM must be caught by the Structural Validator (stage `structural_validate`) with a helpful message, not rejected as malformed JSON at the `compile` stage. |
 | **One canonical IR fixture** shared by TS and Python, guarded by a deep-equality test. | The top risk in a two-language IR is drift; a single shared fixture + equality test eliminates it. |

@@ -14,7 +14,7 @@ skills, real-time updates, single-role approvals, and rollback.
 | Asset | How Phase 1c uses it |
 |-------|----------------------|
 | `GraphBackend` abstraction | Swap `InMemoryBackend` → `LangGraphBackend` (already written, guarded). |
-| `InMemoryCheckpointer` | Swap → `PostgresSaver` (langgraph checkpointer) against the Phase 1b DB. |
+| `InMemoryCheckpointer` | Swap → `PostgresSaver` (langgraph checkpointer) against the Phase 1b Supabase DB. |
 | `ExecutionRunner` + `ExecutionState` | Drive the real runtime; publish each transition. |
 | `skill_compilations` / `skill_executions` tables (1b) | Persist compilations and pin `compilation_id` at trigger time. |
 | Canonical "Add Employee" IR | First real end-to-end execution. |

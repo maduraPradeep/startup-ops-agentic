@@ -2,7 +2,25 @@
 
 **Goal:** Turn the Phase 1a in-memory slice into a running, persistent, multi-tenant API: real
 Postgres-backed schema registry and entity storage, JWT auth, the Schema Builder + Skill Editor
-UI, and an HTTP surface for compilation. **No Directus** — Postgres is the canonical store.
+UI, and an HTTP surface for compilation.
+
+**Persistence decision: Supabase** (no Directus, no Firebase). Supabase **is Postgres** — so the
+canonical store stays relational (JSONB hybrid, pgvector, partitioning, SQL migrations all work
+unchanged). We adopt Supabase as **managed Postgres + auth + Studio**, *not* as the app
+framework: the Fastify API gateway and Python LangGraph runtime remain the architecture. See
+`docs/ROADMAP.md` → "Persistence decision" for the full rationale.
+
+What Supabase gives us:
+- **Managed Postgres** (the `PostgresRegistry` connection target) with pgvector available.
+- **Row-Level Security** as *defense-in-depth* for `tenant_id` isolation, under — never replacing
+  — the app-layer `authorize()` checks. All entity mutations still flow through Fastify so
+  compile-before-execute, RBAC, and audit are enforced.
+- **Supabase Studio** as the thin internal admin UI (this resolves the deferred "admin UI"
+  decision — Studio replaces what Directus would have given us, without sitting in the hot path).
+- **Supabase Auth (GoTrue)** issues JWTs; **Redis still owns `jti` revocation + rate limiting**
+  (GoTrue has no per-token denylist).
+- **Self-hostable / open-source** — keeps the decision reversible, same principle as dropping
+  Directus. Everything underneath is portable Postgres.
 
 **Spec reference:** §3 (Schema Management), §6 (Entity System), §11.1–11.2 (Auth/RBAC), Phase 1b.
 
@@ -22,20 +40,27 @@ UI, and an HTTP surface for compilation. **No Directus** — Postgres is the can
 
 ## Deliverables
 
-1. **Postgres-backed platform config** (replaces the mock registry as the canonical source).
-2. **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest.
-3. **`PostgresRegistry`** + Redis L2 cache (gzip, single-flight, 5-min TTL) behind the existing `Registry` interface.
-4. **`/describe` endpoint** merging platform (Tier 1) + tenant (Tier 2) fields.
-5. **JWT auth** with `jti` revocation (Redis denylist) + RBAC `authorize()` preHandler.
-6. **Schema Builder API + UI** (tenant field extensions, 409-conflict resolution).
-7. **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
-8. **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
+1. **Supabase project** (managed Postgres) provisioned; local dev via the Supabase CLI
+   (`supabase start`) replacing a bare `docker-compose` Postgres.
+2. **Supabase-backed platform config** (replaces the mock registry as the canonical source).
+3. **Entity storage** (JSONB hybrid) for Employee, Department, LeavePolicy, LeaveRequest, with
+   **RLS policies** on `tenant_id` as defense-in-depth.
+4. **`PostgresRegistry`** + Redis L2 cache (gzip, single-flight, 5-min TTL) behind the existing
+   `Registry` interface, pointed at the Supabase connection string.
+5. **`/describe` endpoint** merging platform (Tier 1) + tenant (Tier 2) fields.
+6. **Auth** — Supabase Auth (GoTrue) issues JWTs; Fastify verifies them and enforces `jti`
+   revocation (Redis denylist) + RBAC via the `authorize()` preHandler.
+7. **Schema Builder API + UI** (tenant field extensions, 409-conflict resolution).
+8. **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
+9. **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
+10. **Supabase Studio** wired up as the internal admin surface for raw config/data inspection.
 
 ---
 
 ## Data model (SQL migrations)
 
-Create `apps/api/src/db/migrations/`:
+Use **Supabase migrations** (`supabase/migrations/`, applied via `supabase db push` / CLI) so
+local, CI, and hosted environments stay in lockstep:
 
 - `001_platform_config.sql` — canonical config tables (the no-Directus replacement):
   `entity_definitions`, `platform_fields`, `tool_registry`, `agent_definitions`,
@@ -44,9 +69,11 @@ Create `apps/api/src/db/migrations/`:
   (typed core columns + `extended_data JSONB` + GIN index, per spec §3.6).
 - `003_tenant_fields.sql` — `tenant_field_definitions` (spec §3.3) with the unique constraint.
 - `004_skills.sql` — `skills`, `skill_compilations` (incl. `compilation_hash`), `skill_executions`.
+- `005_rls_policies.sql` — enable RLS + per-tenant policies on entity and skill tables; the
+  Fastify service role bypasses RLS, while any direct/Studio access is tenant-scoped.
 
 > Seed the Phase 1a fixtures (`ENTITY_FIXTURES`, `TOOL_FIXTURES`, `AGENT_FIXTURES`,
-> `ROLE_FIXTURES`) into the config tables as the initial dataset — they become the seed script.
+> `ROLE_FIXTURES`) into the config tables as the initial dataset (a Supabase seed script).
 
 ---
 
@@ -54,11 +81,13 @@ Create `apps/api/src/db/migrations/`:
 
 | Area | Files |
 |------|-------|
+| Supabase setup | `supabase/config.toml`, `supabase/migrations/*`, `supabase/seed.sql` |
+| DB client | `apps/api/src/db/supabase-client.ts` (service-role pg pool, RLS-bypass) |
 | Registry impl | `apps/api/src/services/postgres-registry.ts` (implements `Registry`), `schema-registry.service.ts` (Redis L2 + single-flight + merge) |
 | Entities | `apps/api/src/services/entity.service.ts`, `routes/entities/*` |
 | Schema Builder | `routes/admin/schema/index.ts` (POST 409-conflict + PUT update, spec §3.3) |
 | Skills | `routes/skills/*` (`POST /admin/skills/compile` → `compileSkill`) |
-| Auth | `plugins/auth.plugin.ts` (JWT + jti), `plugins/redis.plugin.ts`, `authorize()` decorator |
+| Auth | `plugins/auth.plugin.ts` (verify Supabase JWT + jti denylist), `plugins/redis.plugin.ts`, `authorize()` decorator |
 | LLM | `apps/api/src/services/claude-llm.ts` (implements `LLMClient`) |
 | Web | `apps/web/src/components/admin/SchemaBuilder/*`, `SkillEditor/*` (+ `FlowEditor/` per §4.6 downside insurance) |
 
@@ -84,8 +113,9 @@ POST /api/v1/admin/skills/tokens/resolve            # autocomplete support
 - `/describe` merges platform + tenant fields, sorted, with `is_system` flags (spec §3.5).
 - Schema Builder returns 409 on an existing field; PUT updates it (spec §3.3).
 - `POST /admin/skills/compile` returns a compilation; second identical call sets `from_cache:true`.
-- JWT: a revoked `jti` is rejected on both HTTP and WS connect (spec §11.1).
-- Integration tests use a disposable Postgres (testcontainers or `docker-compose.dev.yml`).
+- Auth: a Supabase-issued JWT verifies; a revoked `jti` is rejected on both HTTP and WS connect (spec §11.1).
+- RLS: a query under tenant A's role cannot read tenant B's rows; the Fastify service role can.
+- Integration tests run against a local Supabase (`supabase start`) in CI.
 
 ---
 
@@ -95,10 +125,16 @@ POST /api/v1/admin/skills/tokens/resolve            # autocomplete support
 - **Cache invalidation** (tenant field change → Redis publish → clear key) must be exercised.
 - **Compilation determinism** — `ClaudeLLM` output varies; rely on the cache + validators, and
   keep the editable FlowEditor as the fallback if the success rate dips below 90% (spec §4.6).
+- **Don't let Supabase erode the gateway** — no client-direct PostgREST writes for entities or
+  skills; everything goes through Fastify so authz/audit/compile-before-execute hold. RLS is a
+  safety net, not the authorization model.
+- **Auth split** — JWTs come from GoTrue but revocation lives in Redis; keep the two clearly
+  separated so a Supabase outage doesn't silently disable revocation checks.
 
 ---
 
 ## Exit criteria → Phase 1c
 
 A tenant admin can: extend a schema, author a skill in the editor, compile it (real Claude),
-see the visual validation, and persist the compilation — all on Postgres, no Directus.
+see the visual validation, and persist the compilation — all on Supabase Postgres, with RLS
+enforcing tenant isolation and Studio available for internal inspection.
