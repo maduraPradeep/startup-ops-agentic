@@ -87,8 +87,13 @@ def build_graph(
     context = context or default_context()
     edges = definition["edges"]
 
+    # Backends that support interrupts (LangGraphBackend) pause before human_input nodes.
+    mark_interrupt = getattr(backend, "mark_interrupt", None)
+
     for node in definition["nodes"]:
         backend.add_node(node["id"], _make_handler(node, context))
+        if node.get("step_type") == "human_input" and callable(mark_interrupt):
+            mark_interrupt(node["id"])
 
     condition_sources = {e["from"] for e in edges if e.get("condition")}
 

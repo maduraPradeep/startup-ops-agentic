@@ -55,7 +55,8 @@ class LangGraphExecutor:  # pragma: no cover - requires langgraph installed
     def _sync_from_thread(self) -> None:
         """Refresh ``data`` from the persisted checkpoint (post-invoke source of truth)."""
         snapshot = self.compiled.runnable.get_state(self._config)
-        self.data = dict(snapshot.values or {})
+        # State lives under the single ``state`` channel (see LangGraphBackend.default_state_type).
+        self.data = dict((snapshot.values or {}).get("state", {}) or {})
         # ``next`` is the tuple of nodes about to run; empty == the graph finished.
         nxt = tuple(snapshot.next or ())
         self.paused_node = nxt[0] if nxt else None
@@ -63,7 +64,7 @@ class LangGraphExecutor:  # pragma: no cover - requires langgraph installed
     def run(self, initial_state: dict[str, Any] | None = None) -> ExecutionState:
         """Invoke the graph; return COMPLETED or the AWAITING_* pause state."""
         self.state = ExecutionState.RUNNING
-        self.compiled.runnable.invoke(dict(initial_state or {}), self._config)
+        self.compiled.runnable.invoke({"state": dict(initial_state or {})}, self._config)
         self._sync_from_thread()
         return self._settle()
 

@@ -13,19 +13,21 @@ from the checkpoint on the next ``invoke(None, config)``. The compiled object is
 exposing the live runtime for the executor.
 """
 
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
 from .graph_backend import CompiledGraph, GraphBackend
 
 try:  # pragma: no cover - import outcome depends on the environment
     from langgraph.checkpoint.memory import MemorySaver  # type: ignore
     from langgraph.graph import END, StateGraph  # type: ignore
+    from typing_extensions import TypedDict  # type: ignore
 
     _LANGGRAPH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     StateGraph = None  # type: ignore
     MemorySaver = None  # type: ignore
     END = "__end__"  # type: ignore
+    TypedDict = dict  # type: ignore
     _LANGGRAPH_AVAILABLE = False
 
 
@@ -34,19 +36,52 @@ def langgraph_available() -> bool:
     return _LANGGRAPH_AVAILABLE
 
 
-def default_state_type() -> Any:
-    """The permissive dict state schema: a plain ``dict`` with last-write-wins merge.
+# The executor reads/writes the accumulated execution dict under this single channel.
+STATE_CHANNEL = "state"
 
-    ``StateGraph(dict)`` lets handlers write **arbitrary** keys (the IR ``state_schema`` fields plus
-    bookkeeping keys like ``entity_record`` / ``collected`` / ``notifications_sent``) and persists
-    them across nodes and across an interrupt/resume -- a ``TypedDict`` would silently drop any key
-    it does not declare. The slice-#2 handlers return full-value deltas (e.g. ``notify`` reads then
-    re-emits the whole ``notifications_sent`` list), so langgraph's default last-write-wins merge is
-    exactly right and no custom reducer is needed.
+
+def _merge_state(left: dict | None, right: dict | None) -> dict:
+    """Reducer for the ``state`` channel: shallow-merge each node's delta (last-write-wins)."""
+    return {**(left or {}), **(right or {})}
+
+
+def default_state_type() -> Any:
+    """A single ``state`` channel holding the whole execution dict, with a merge reducer.
+
+    A plain ``StateGraph(dict)`` is unreliable here: dynamically-created channels are only
+    surfaced by ``invoke()``'s return value, while ``get_state().values`` (what the executor
+    reads to detect pauses + carry state forward) collapses to just the last node's writes. A
+    single ``Annotated[dict, _merge_state]`` channel instead **accumulates** every handler's
+    delta -- arbitrary keys included (IR ``state_schema`` fields plus bookkeeping like
+    ``entity_record`` / ``employee_id`` / ``notifications_sent``) -- and persists across nodes
+    and across an interrupt/resume, so ``get_state().values["state"]`` is the full state.
     """
     if not _LANGGRAPH_AVAILABLE:  # pragma: no cover - guarded by callers
         raise RuntimeError("langgraph is not installed")
-    return dict
+
+    class GraphState(TypedDict):
+        state: Annotated[dict, _merge_state]
+
+    return GraphState
+
+
+def _wrap_node(handler: Callable[..., Any]) -> Callable[..., Any]:
+    """Adapt a slice-2 ``(state) -> delta`` handler to a single-channel langgraph node."""
+
+    def node(graph_state: dict[str, Any]) -> dict[str, Any]:
+        delta = handler(graph_state.get(STATE_CHANNEL, {}) or {})
+        return {STATE_CHANNEL: delta or {}}
+
+    return node
+
+
+def _wrap_router(router: Callable[..., str]) -> Callable[..., str]:
+    """Adapt a ``(state) -> target`` router to read the single-channel graph state."""
+
+    def route(graph_state: dict[str, Any]) -> str:
+        return router(graph_state.get(STATE_CHANNEL, {}) or {})
+
+    return route
 
 
 class LangGraphCompiledGraph(CompiledGraph):  # pragma: no cover - requires langgraph installed
@@ -104,7 +139,9 @@ class LangGraphBackend(GraphBackend):  # pragma: no cover - requires langgraph i
         self._interrupt_nodes: list[str] = []
 
     def add_node(self, node_id: str, handler: Callable[..., Any]) -> None:
-        self._graph.add_node(node_id, handler)
+        # Handlers are backend-agnostic (state)->delta closures; wrap them to read/write the
+        # single ``state`` channel so the merge reducer accumulates each node's delta.
+        self._graph.add_node(node_id, _wrap_node(handler))
         self._node_ids.append(node_id)
 
     def add_edge(self, source: str, target: str) -> None:
@@ -117,7 +154,7 @@ class LangGraphBackend(GraphBackend):  # pragma: no cover - requires langgraph i
     ) -> None:
         # Map the router's logical targets ("end" -> END) so langgraph resolves the terminal sink.
         path_map = {t: (END if t == "end" else t) for t in targets}
-        self._graph.add_conditional_edges(source, router, path_map)
+        self._graph.add_conditional_edges(source, _wrap_router(router), path_map)
         self._conditional[source] = (router, targets)
 
     def set_entry_point(self, node_id: str) -> None:
