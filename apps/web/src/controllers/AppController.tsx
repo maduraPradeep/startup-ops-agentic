@@ -6,6 +6,7 @@ import { ActiveWorkflowsController } from './ActiveWorkflowsController';
 import { PendingApprovalsController } from './PendingApprovalsController';
 import { RecentEntitiesController } from './RecentEntitiesController';
 import { SchemaBuilderController } from './SchemaBuilderController';
+import { SkillEditorController } from './SkillEditorController';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
@@ -44,10 +45,12 @@ export function AppController({ children }: Props) {
         onToggleCollapse={toggleCollapse}
         onSignOut={clearAuth}
         onOpenSchemaBuilder={() => openSurface('schema-builder')}
+        onOpenSkillEditor={() => openSurface('skill-editor')}
       >
         {children}
       </AppLayout>
       {surface === 'schema-builder' && <SchemaBuilderController onClose={closeSurface} />}
+      {surface === 'skill-editor' && <SkillEditorController onClose={closeSurface} />}
     </>
   );
 }

@@ -75,8 +75,15 @@ Status legend: ✅ done · 🟡 partial · ⬜ not started. The **backend compil
    `admin-surface.store`) — entity picker, merged Tier1/Tier2 field table (system fields
    read-only), add/edit drawer with inline 409/404/400 surfacing. See
    `PHASE-1B-SCHEMA-BUILDER-UI-SLICE-SUMMARY.md`.
-8. ⬜ **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
-   *(autocomplete backend done via `/admin/skills/tokens/resolve`)*
+8. ✅ **Skill Editor UI** — a full-page admin overlay (`SkillEditorController` +
+   `views/admin/skill/*`, opened from the sidebar via `admin-surface.store`) over the
+   already-shipped compile/resolve API. Three panels: authoring textarea with a live token-status
+   panel (debounced `POST /admin/skills/tokens/resolve`, flags unresolved tokens), a Compile
+   button + compilation panel (stage checklist derived from the result, `from_cache` badge,
+   `compilation_hash`, operator-friendly warnings, and inline `stage`/`message`/`token_at_fault`/
+   `suggestion` on failure), and a **hand-rolled read-only flow graph** rendering
+   `react_flow_graph` (no `reactflow` dep). Detects the 503 compiler-unavailable state and degrades
+   gracefully. See `PHASE-1B-SKILL-EDITOR-UI-SLICE-SUMMARY.md`.
 9. ✅ **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
    *(`SkillCompilerService` + `ClaudeLLM` + shared `CompilationCache` → `from_cache`)*
 10. ⬜ **Supabase Studio** wired up as the internal admin surface for raw config/data inspection.
@@ -164,3 +171,8 @@ POST /api/v1/admin/skills/tokens/resolve            # autocomplete support
 A tenant admin can: extend a schema, author a skill in the editor, compile it (real Claude),
 see the visual validation, and persist the compilation — all on Supabase Postgres, with RLS
 enforcing tenant isolation and Studio available for internal inspection.
+
+> With #7 (Schema Builder UI) and #8 (Skill Editor UI) landed, the core operator loop of the exit
+> criteria — extend a schema, author/compile a skill, and see its visual validation — is
+> essentially met. Remaining gaps are the `departments`/`leave_policies` entity storage (#3) and
+> Supabase Studio wiring (#10).

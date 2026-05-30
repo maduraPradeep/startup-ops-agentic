@@ -9,7 +9,7 @@ import { devtools } from 'zustand/middleware';
 //
 // Not persisted: an overlay should not survive a reload (the operator lands back on chat).
 
-export type AdminSurface = 'schema-builder' | null;
+export type AdminSurface = 'schema-builder' | 'skill-editor' | null;
 
 interface AdminSurfaceState {
   surface: AdminSurface;
