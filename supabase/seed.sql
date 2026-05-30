@@ -6,6 +6,11 @@
 -- fields on "people" (is_system = false), which Phase 1a keeps inline in the
 -- entity fixture, so they are seeded into platform_fields here for parity.
 --
+-- It also seeds a small set of dev-tenant ENTITY DATA (departments, employees,
+-- leave policies, leave requests) plus DEFAULT SKILLS and one tenant skill, so the
+-- entity CRUD surface, the Schema Builder / Skill Editor UIs, and Phase 1c skill
+-- execution have realistic data to run against without manual setup.
+--
 -- Idempotent: safe to re-run.
 
 -- ── Dev tenant ─────────────────────────────────────────────────────────────────
@@ -82,3 +87,57 @@ INSERT INTO roles (name, permissions) VALUES
   ('manager',  '["employees:read","leave_requests:approve"]'),
   ('employee', '["employees:read_self","leave_requests:create"]')
 ON CONFLICT (name) DO UPDATE SET permissions = EXCLUDED.permissions;
+
+-- ════════════════════════════════════════════════════════════════════════════════
+-- DEV-TENANT ENTITY DATA (tenant: Acme Corp / …0001)
+-- Typed core columns + extended_data JSONB (spec §3.6). Stable UUIDs so foreign-key
+-- relationships wire up and re-runs stay idempotent (ON CONFLICT (id) DO NOTHING).
+-- Insert order respects FKs: departments → employees (managers before reports) →
+-- leave_requests; department heads reference known employee UUIDs (head has no FK).
+-- ════════════════════════════════════════════════════════════════════════════════
+
+-- ── Departments ──────────────────────────────────────────────────────────────────
+INSERT INTO departments (id, tenant_id, name, head) VALUES
+  ('aaaa0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Engineering', 'bbbb0000-0000-0000-0000-000000000001'),
+  ('aaaa0000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'People Ops',  'bbbb0000-0000-0000-0000-000000000004')
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Employees ────────────────────────────────────────────────────────────────────
+-- Ada heads Engineering (no manager); Grace & Alan report up the chain; Radia heads
+-- People Ops and carries the two Tier 2 extension fields in extended_data.
+INSERT INTO employees (id, tenant_id, name, email, role, department_id, manager_id, start_date, employment_type, slack_id, extended_data) VALUES
+  ('bbbb0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Ada Lovelace',  'ada@acme.test',   'Engineering Lead',   'aaaa0000-0000-0000-0000-000000000001', NULL,                                   '2021-01-04', 'full_time', 'U0ADA',   '{}'),
+  ('bbbb0000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Grace Hopper',  'grace@acme.test', 'Senior Engineer',    'aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001', '2022-03-15', 'full_time', 'U0GRC',   '{}'),
+  ('bbbb0000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Alan Turing',   'alan@acme.test',  'Engineer',           'aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000002', '2023-09-01', 'full_time', 'U0ALN',   '{}'),
+  ('bbbb0000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Radia Perlman', 'radia@acme.test', 'People Ops Manager', 'aaaa0000-0000-0000-0000-000000000002', NULL,                                   '2021-06-21', 'full_time', 'U0RAD',   '{"pronouns":"she/her","linkedin_summary":"Pioneer of network routing protocols."}')
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Leave policies ───────────────────────────────────────────────────────────────
+INSERT INTO leave_policies (id, tenant_id, name, leave_type, max_days_per_year, requires_approval, notice_days_required) VALUES
+  ('cccc0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Annual Leave', 'annual', 25, TRUE,  14),
+  ('cccc0000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Sick Leave',   'sick',   10, FALSE, 0)
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Leave requests ───────────────────────────────────────────────────────────────
+INSERT INTO leave_requests (id, tenant_id, employee_id, start_date, end_date, type, status, reason) VALUES
+  ('dddd0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000002', '2026-07-06', '2026-07-10', 'annual', 'submitted', 'Summer holiday'),
+  ('dddd0000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000003', '2026-06-01', '2026-06-02', 'sick',   'approved',  'Flu')
+ON CONFLICT (id) DO NOTHING;
+
+-- ════════════════════════════════════════════════════════════════════════════════
+-- SKILLS — global default skills (operator-authored text the compiler turns into a
+-- LangGraph) + one tenant-owned skill, so Phase 1c has something to compile/execute.
+-- ════════════════════════════════════════════════════════════════════════════════
+
+INSERT INTO default_skills (name, label, skill_text) VALUES
+  ('onboard_employee', 'Onboard New Employee',
+   'When a new hire is confirmed, create their employee record in @people. Then send them a welcome email with @tool:send_email and post a short introduction to the team channel with @tool:slack_post. Finally, schedule a first-day orientation using @tool:calendar_create.'),
+  ('sync_hris', 'Sync Employee to HRIS',
+   'After an employee record changes, have @agent:hr_bot push the updated record to the external HRIS with @tool:hris_sync. Because this is a destructive operation, require hr_admin approval before the sync runs.')
+ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label, skill_text = EXCLUDED.skill_text;
+
+INSERT INTO skills (id, tenant_id, name, skill_text, author_role) VALUES
+  ('eeee0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Onboard New Employee',
+   'When a new hire is confirmed, create their employee record in @people. Then send them a welcome email with @tool:send_email and post a short introduction to the team channel with @tool:slack_post. Finally, schedule a first-day orientation using @tool:calendar_create.',
+   'hr_admin')
+ON CONFLICT (tenant_id, name) DO NOTHING;
