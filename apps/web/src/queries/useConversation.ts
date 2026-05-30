@@ -13,7 +13,7 @@ export function useConversationSocket() {
 
     const wsUrl = (import.meta.env.VITE_WS_URL ?? 'ws://localhost:3001')
       .replace(/^http/, 'ws');
-    const ws = new WebSocket(`${wsUrl}/api/v1/conversations/ws`);
+    const ws = new WebSocket(`${wsUrl}/api/v1/conversations/ws?token=${encodeURIComponent(token)}`);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {

@@ -10,8 +10,7 @@ import type {
   SplitPayload,
 } from './entity-store';
 
-// Phase 1b — Entity System (spec §3.6, §6). Replaces the legacy Directus-backed
-// EntityModel: CRUD over the per-tenant Postgres tables, registry-driven.
+// Phase 1b — Entity System (spec §3.6, §6). CRUD over the per-tenant Postgres tables, registry-driven.
 //
 // The merged /describe field set (Tier 1 platform + Tier 2 tenant) is the single source
 // of truth for what may be written: Tier 1 system fields map to typed columns, Tier 2

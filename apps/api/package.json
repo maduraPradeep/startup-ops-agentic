@@ -10,7 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@directus/sdk": "^17.0.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/jwt": "^10.0.0",

@@ -5,7 +5,7 @@ import type { LLMClient } from '@ops/compiler';
 // Implements the @ops/compiler `LLMClient` interface, so it is a drop-in for MockLLM:
 // `compile(prompt)` returns a raw (untyped) LangGraph definition object that the pipeline
 // then validates. We call the Anthropic Messages API over fetch rather than pulling in the
-// SDK (same precedent as the fetch-based Directus wrapper) and inject the transport so the
+// SDK and inject the transport so the
 // network is mockable in tests. The deterministic compiler prompt is the user message; a
 // fixed instruction sits in the cached system block (prompt caching keeps repeat compiles
 // cheap — the system block is identical across every skill).

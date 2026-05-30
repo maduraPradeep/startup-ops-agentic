@@ -7,7 +7,7 @@ import {
 import { WorkflowModel } from '../models/workflow.model.js';
 
 // Phase 1b — Entity System over Postgres (spec §3.6, §6). Backed by EntityService
-// (the registry-driven, JSONB-hybrid store) instead of the legacy Directus path.
+// (the registry-driven, JSONB-hybrid store).
 // Action invocation still delegates to WorkflowModel — real execution lands in 1c.
 
 export function createEntityController(fastify: FastifyInstance) {

@@ -1,8 +1,8 @@
 import type { VerifiedIdentity } from './supabase-jwt';
 
-// Phase 1b — legacy @fastify/jwt fallback path (dev/CI + the Directus login bridge).
+// Phase 1b — legacy @fastify/jwt fallback path (dev/CI).
 //
-// When SUPABASE_JWT_SECRET is NOT set, the gateway keeps verifying the tokens our own
+// When SUPABASE_JWT_SECRET is NOT set, the gateway verifies the tokens our own
 // auth.controller signs with JWT_SECRET. Those carry our TokenPayload directly. They have no
 // GoTrue session_id, so the revocation key is an explicit `jti` if present, else a stable
 // per-user key (`legacy:{userId}`) — revoking it denies that user's legacy tokens until expiry.

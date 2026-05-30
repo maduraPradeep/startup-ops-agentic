@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { ApprovalModel } from '../models/approval.model.js';
+import { createApprovalModel } from '../models/approval.model.js';
 
 export function createApprovalController(fastify: FastifyInstance) {
+  const ApprovalModel = createApprovalModel(fastify.db);
+
   return {
     async listPending(request: FastifyRequest, reply: FastifyReply) {
       const data = await ApprovalModel.findPending(request.tenantId, request.user.userId);

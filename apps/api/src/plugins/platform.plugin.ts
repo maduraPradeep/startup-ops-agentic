@@ -32,6 +32,7 @@ import { PostgresCompilationStore } from '../services/compilation-store.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
+    db: SupabaseClient | null;
     schemaRegistry: SchemaRegistryService;
     schemaBuilder: SchemaBuilderService;
     entities: EntityService;
@@ -47,8 +48,10 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
   let entityStore: EntityStore;
   let compilationStore: PostgresCompilationStore | undefined;
 
+  let db: SupabaseClient | null = null;
   if (connectionString) {
     const client = new SupabaseClient({ connectionString });
+    db = client;
     registry = await PostgresRegistry.create(client);
     tenantFields = new PostgresTenantFieldStore(client);
     entityStore = new PostgresEntityStore(client);
@@ -63,6 +66,7 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
     entityStore = new InMemoryEntityStore();
     fastify.log.warn('[platform] no DB configured — using MockRegistry + in-memory stores');
   }
+  fastify.decorate('db', db);
 
   const cache: CacheStore = fastify.hasDecorator('redis')
     ? new RedisCacheStore(fastify.redis)

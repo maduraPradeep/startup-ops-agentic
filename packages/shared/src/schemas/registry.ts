@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Phase 1a — platform-config registry shapes (spec §3.2, §5.3, §10.1).
 //
-// In Phase 1b these are backed by Postgres tables (NOT Directus). In Phase 1a they are
+// In Phase 1b these are backed by Postgres tables. In Phase 1a they are
 // served by an in-memory mock registry. Field names mirror the spec's collections.
 
 export const PlatformFieldSchema = z.object({

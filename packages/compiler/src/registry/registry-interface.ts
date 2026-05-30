@@ -7,7 +7,7 @@ import type {
 } from '@ops/shared';
 
 // Phase 1a — abstraction over the platform-config source of truth (spec §3.4).
-// The Phase 1b implementation reads Postgres (no Directus); Phase 1a uses an in-memory mock.
+// The Phase 1b implementation reads Postgres; Phase 1a uses an in-memory mock.
 
 export interface Registry {
   getEntity(name: string): EntityDefinition | null;

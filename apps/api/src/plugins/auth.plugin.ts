@@ -103,7 +103,10 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
 
   fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
     try {
-      const token = extractBearer(request.headers.authorization);
+      // WebSocket upgrade requests cannot carry an Authorization header from browsers,
+      // so accept the token as a query parameter (?token=...) as a fallback.
+      const queryToken = (request.query as Record<string, string | undefined>).token;
+      const token = extractBearer(request.headers.authorization) ?? queryToken?.trim() ?? undefined;
       if (!token) {
         reply.status(401).send({ error: 'Unauthorized' });
         return;

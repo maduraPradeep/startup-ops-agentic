@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
 import { MessageSchema } from '@ops/shared';
-import { ConversationModel } from '../models/conversation.model.js';
+import { createConversationModel } from '../models/conversation.model.js';
 
 export function createConversationController(fastify: FastifyInstance) {
+  const ConversationModel = createConversationModel(fastify.db);
+
   return {
     async list(request: FastifyRequest, reply: FastifyReply) {
       const data = await ConversationModel.findByTenant(request.tenantId);

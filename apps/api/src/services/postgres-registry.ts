@@ -13,7 +13,7 @@ import type { Registry } from '@ops/compiler';
 import type { SupabaseClient } from '../db/supabase-client';
 
 // Phase 1b — Postgres-backed Registry. It is the canonical platform-config source
-// (the no-Directus replacement) and is a drop-in for MockRegistry: same `Registry`
+// and is a drop-in for MockRegistry: same `Registry`
 // interface, same shapes, same `getRole('all')` broadcast pseudo-role behavior.
 //
 // The Registry interface is synchronous (the compiler resolves tokens synchronously),

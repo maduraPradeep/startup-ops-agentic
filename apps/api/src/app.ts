@@ -6,7 +6,6 @@ import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 
 import { authPlugin } from './plugins/auth.plugin.js';
-import { directusPlugin } from './plugins/directus.plugin.js';
 import { redisPlugin } from './plugins/redis.plugin.js';
 import { tenantPlugin } from './plugins/tenant.plugin.js';
 import { websocketPlugin } from './plugins/websocket.plugin.js';
@@ -39,7 +38,6 @@ export async function buildApp() {
   await app.register(rateLimit, { max: 200, timeWindow: '1 minute' });
 
   await app.register(redisPlugin);
-  await app.register(directusPlugin);
   await app.register(authPlugin);
   await app.register(tenantPlugin);
   await app.register(websocket);
