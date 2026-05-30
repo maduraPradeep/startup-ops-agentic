@@ -24,8 +24,15 @@ skills, real-time updates, single-role approvals, and rollback.
 ## Deliverables
 
 1. **Real LangGraph runtime** — install `langgraph`, enable `LangGraphBackend`, `PostgresSaver`.
-2. **Step handlers** — implement each `step_type`: `collect`, `enrich`, `entity_tool`, `notify`,
-   `start_agent`, `condition`, `human_input`, `end` (Phase 1a runner currently no-ops them).
+   _(NEXT SLICE — still deferred. Handlers from #2 are written to be reused as-is.)_
+2. **Step handlers** — ✅ **Done (2026-05-30).** Implemented each side-effecting `step_type`
+   (`collect`, `enrich`, `entity_tool`, `notify`, `start_agent`, `condition`) as backend-agnostic
+   closures over `(node, context)` returning a state delta; `human_input`/`end` are control no-ops.
+   Side effects go through injected `Protocol` ports (`EntityClient`/`ToolClient`/`Notifier`/
+   `AgentClient`) bundled in an `ExecutionContext`, with in-memory fakes as the default. The runner
+   now invokes each handler and merges its delta before checkpointing, preserving one-checkpoint-
+   per-node. See `PHASE-1C-STEP-HANDLERS-SLICE-SUMMARY.md`. _(No real langgraph runtime / no
+   PostgresSaver yet — that is deliverable #1, the next slice.)_
 3. **Skill lifecycle** — `draft → compiled → validated → live → archived` (spec §4.7).
 4. **`ExecutionState` machine over the wire** — distinguish `awaiting_human_input` vs
    `awaiting_approval`; persist `current_state` on `skill_executions`.

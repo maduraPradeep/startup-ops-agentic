@@ -3,8 +3,10 @@
 from typing import Any, Callable
 
 from .graph_backend import CompiledGraph, GraphBackend
+from .handlers import make_handler
 from .inmemory_backend import InMemoryBackend
 from .ir import VALID_STEP_TYPES, LangGraphDefinition
+from .ports import ExecutionContext, default_context
 
 
 def validate(definition: LangGraphDefinition) -> list[str]:
@@ -44,13 +46,15 @@ def validate(definition: LangGraphDefinition) -> list[str]:
     return errors
 
 
-def _make_handler(node: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
-    # Phase 1a handlers are no-ops; the ExecutionRunner drives state transitions.
-    def handler(state: dict[str, Any]) -> dict[str, Any]:
-        return {}
+def _make_handler(
+    node: dict[str, Any], context: ExecutionContext
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    """Backend-agnostic step handler closure (see ``handlers.make_handler``).
 
-    handler.__name__ = f"handle_{node['id']}"
-    return handler
+    Returns ``node(state) -> state_delta`` -- the LangGraph node convention -- so the same
+    closure is reusable by both the in-memory backend and the future ``LangGraphBackend``.
+    """
+    return make_handler(node, context)
 
 
 def _make_router(outgoing: list[dict[str, Any]]) -> Callable[[dict[str, Any]], str]:
@@ -68,17 +72,23 @@ def build_graph(
     definition: LangGraphDefinition,
     backend: GraphBackend | None = None,
     checkpointer: Any | None = None,
+    context: ExecutionContext | None = None,
 ) -> CompiledGraph:
-    """Validate then build a graph via the given backend (in-memory by default)."""
+    """Validate then build a graph via the given backend (in-memory by default).
+
+    ``context`` carries the side-effecting ports each handler closes over; it defaults to the
+    in-memory fakes so existing call sites and tests need zero wiring.
+    """
     errors = validate(definition)
     if errors:
         raise ValueError(f"IR validation failed: {'; '.join(errors)}")
 
     backend = backend or InMemoryBackend()
+    context = context or default_context()
     edges = definition["edges"]
 
     for node in definition["nodes"]:
-        backend.add_node(node["id"], _make_handler(node))
+        backend.add_node(node["id"], _make_handler(node, context))
 
     condition_sources = {e["from"] for e in edges if e.get("condition")}
 

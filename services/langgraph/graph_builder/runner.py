@@ -5,7 +5,9 @@ from typing import Any
 
 from .checkpointer import InMemoryCheckpointer
 from .execution_state import ExecutionState
+from .handlers import make_handler
 from .ir import LangGraphDefinition
+from .ports import ExecutionContext, default_context
 
 
 class ExecutionRunner:
@@ -14,10 +16,12 @@ class ExecutionRunner:
         definition: LangGraphDefinition,
         checkpointer: InMemoryCheckpointer | None = None,
         thread_id: str = "thread-1",
+        context: ExecutionContext | None = None,
     ) -> None:
         self.definition = definition
         self.thread_id = thread_id
         self.checkpointer = checkpointer or InMemoryCheckpointer()
+        self.context = context or default_context()
         self._nodes = {n["id"]: n for n in definition["nodes"]}
         self.data: dict[str, Any] = {}
         self.state: ExecutionState = ExecutionState.INITIATED
@@ -57,12 +61,16 @@ class ExecutionRunner:
                 continue  # auto-resume: loop hits the resume branch and advances
 
             if step_type == "end":
+                # Control node: no side effect; runner owns the terminal transition.
                 self._enter(node_id, ExecutionState.RUNNING)
                 self.current_node = None
                 self.state = ExecutionState.COMPLETED
                 self.state_history.append(ExecutionState.COMPLETED)
                 return self.state
 
+            # Side-effecting node: run its handler and merge the delta BEFORE checkpointing,
+            # so the (single) per-node checkpoint captures the post-handler state.
+            self._run_handler(node)
             self._enter(node_id, ExecutionState.RUNNING)
             node_id = self._next(node_id)
 
@@ -71,6 +79,13 @@ class ExecutionRunner:
         self.state = ExecutionState.COMPLETED
         self.state_history.append(ExecutionState.COMPLETED)
         return self.state
+
+    def _run_handler(self, node: dict[str, Any]) -> None:
+        """Invoke the node's handler closure and merge its returned delta into ``self.data``."""
+        handler = make_handler(node, self.context)
+        delta = handler(dict(self.data))
+        if delta:
+            self.data.update(delta)
 
     def _enter(self, node_id: str, state: ExecutionState) -> None:
         self.state = state

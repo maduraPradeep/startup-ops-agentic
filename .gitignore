@@ -11,3 +11,5 @@ services/langgraph/.venv/
 .dev-seeded
 supabase/.branches/
 supabase/.temp/
+services/langgraph/graph_builder/__pycache__/
+services/langgraph/tests/__pycache__/
