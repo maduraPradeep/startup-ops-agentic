@@ -12,6 +12,12 @@ from .fakes import (
 from .fixtures import load_add_employee
 from .handlers import make_handler
 from .inmemory_backend import InMemoryBackend, InMemoryGraph
+from .langgraph_backend import (
+    LangGraphBackend,
+    LangGraphCompiledGraph,
+    default_state_type,
+    langgraph_available,
+)
 from .ports import (
     AgentClient,
     EntityClient,
@@ -20,6 +26,7 @@ from .ports import (
     ToolClient,
     default_context,
 )
+from .langgraph_executor import LangGraphExecutor
 from .runner import ExecutionRunner
 
 __all__ = [
@@ -31,6 +38,11 @@ __all__ = [
     "InMemoryCheckpointer",
     "ExecutionState",
     "ExecutionRunner",
+    "LangGraphBackend",
+    "LangGraphCompiledGraph",
+    "LangGraphExecutor",
+    "langgraph_available",
+    "default_state_type",
     "ExecutionContext",
     "default_context",
     "EntityClient",

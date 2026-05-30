@@ -13,8 +13,8 @@ skills, real-time updates, single-role approvals, and rollback.
 
 | Asset | How Phase 1c uses it |
 |-------|----------------------|
-| `GraphBackend` abstraction | Swap `InMemoryBackend` → `LangGraphBackend` (already written, guarded). |
-| `InMemoryCheckpointer` | Swap → `PostgresSaver` (langgraph checkpointer) against the Phase 1b Supabase DB. |
+| `GraphBackend` abstraction | ✅ `LangGraphBackend` now executes a real `StateGraph`; in-memory stays the default/fallback. |
+| `InMemoryCheckpointer` | ✅ `PostgresSaver` (langgraph checkpointer) wired against the Phase 1b Supabase DB; `MemorySaver` for tests. |
 | `ExecutionRunner` + `ExecutionState` | Drive the real runtime; publish each transition. |
 | `skill_compilations` / `skill_executions` tables (1b) | Persist compilations and pin `compilation_id` at trigger time. |
 | Canonical "Add Employee" IR | First real end-to-end execution. |
@@ -23,8 +23,22 @@ skills, real-time updates, single-role approvals, and rollback.
 
 ## Deliverables
 
-1. **Real LangGraph runtime** — install `langgraph`, enable `LangGraphBackend`, `PostgresSaver`.
-   _(NEXT SLICE — still deferred. Handlers from #2 are written to be reused as-is.)_
+1. **Real LangGraph runtime** — ✅ **Done (2026-05-30).** Installed `langgraph==0.6.8` +
+   `langgraph-checkpoint-postgres==2.0.24` (+ `psycopg`/`psycopg-pool`). `LangGraphBackend` now
+   builds a real `StateGraph` over a permissive dict-state (default overwrite reducer — the
+   slice-#2 handlers emit full-value deltas, so no custom reducer is needed) and registers the
+   slice-#2 handler closures unchanged via `add_node`. `human_input` nodes compile as
+   `interrupt_before` points: a run **pauses** there and **resumes from the checkpoint** on
+   `invoke(None, {thread_id})`; the paused node's `config.kind` maps to `AWAITING_APPROVAL`
+   (`approval`) vs `AWAITING_HUMAN_INPUT`, exactly as the custom runner does. A thin
+   `LangGraphExecutor` drives a compiled graph and exposes `ExecutionState` + merged state + pause
+   point. Checkpointing: `MemorySaver` for tests, langgraph's `PostgresSaver` for production
+   against the Phase 1b Supabase DB (DSN from `LANGGRAPH_DB_URL`/`SUPABASE_DB_URL`/`DATABASE_URL`,
+   local `:54322` fallback) — its own `checkpoint*` tables (`.setup()`), kept **separate** from our
+   `skill_executions` index (untouched this slice). Graceful degradation preserved: when
+   `langgraph` is absent, the in-memory backend stays the default and all existing tests pass; the
+   langgraph + PostgresSaver tests skip-not-fail (gated on `langgraph_available()` / DB
+   reachability). See `PHASE-1C-RUNTIME-SLICE-SUMMARY.md`.
 2. **Step handlers** — ✅ **Done (2026-05-30).** Implemented each side-effecting `step_type`
    (`collect`, `enrich`, `entity_tool`, `notify`, `start_agent`, `condition`) as backend-agnostic
    closures over `(node, context)` returning a state delta; `human_input`/`end` are control no-ops.
@@ -51,8 +65,8 @@ skills, real-time updates, single-role approvals, and rollback.
 
 | Area | Files |
 |------|-------|
-| Runtime | `services/langgraph/graph_builder/handlers/*.py` (one per step type), wire into `builder.py` `_make_handler` |
-| Checkpointer | `services/langgraph/graph_builder/postgres_checkpointer.py` (or langgraph's `PostgresSaver`) |
+| Runtime | ✅ `graph_builder/handlers.py` (closures); ✅ `graph_builder/langgraph_backend.py` (real `StateGraph`) + `graph_builder/langgraph_executor.py` (run/resume) |
+| Checkpointer | ✅ `graph_builder/postgres_checkpointer.py` (langgraph's `PostgresSaver` binding + DSN/reachability helpers); `MemorySaver` for tests |
 | Service bridge | `apps/api/src/services/skill-executor.service.ts` (trigger → call Python → stream state) |
 | Lifecycle | `routes/skills/{publish,validate,rollback,execute,fork}.ts` |
 | Real-time | `plugins/websocket.plugin.ts` (user-msg vs ping handling), SSE route |

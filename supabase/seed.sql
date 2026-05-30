@@ -18,6 +18,80 @@ INSERT INTO tenants (id, name, slug) VALUES
   ('00000000-0000-0000-0000-000000000001', 'Acme Corp', 'acme')
 ON CONFLICT (id) DO NOTHING;
 
+-- ════════════════════════════════════════════════════════════════════════════════
+-- AUTH USERS — one per role so every permission path is testable without a live
+-- GoTrue signup flow. app_metadata carries the claims mapGoTrueClaims() reads
+-- (role, tenant_id, tenant_name, name). Password for all: Password1!
+--
+-- UUID alignment: auth user IDs match the corresponding employee row IDs so the
+-- dev identity is obvious at a glance. The platform_admin has no employee record.
+-- ════════════════════════════════════════════════════════════════════════════════
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+INSERT INTO auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  is_super_admin, created_at, updated_at
+) VALUES
+  -- platform_admin — no employee record; full platform access
+  ('00000000-0000-0000-0000-000000000000',
+   'ffff0000-0000-0000-0000-000000000001',
+   'authenticated', 'authenticated',
+   'admin@acme.test',
+   crypt('Password1!', gen_salt('bf')),
+   NOW(),
+   '{"role":"platform_admin","tenant_id":"00000000-0000-0000-0000-000000000001","tenant_name":"Acme Corp","name":"Platform Admin"}',
+   '{}', FALSE, NOW(), NOW()),
+  -- hr_admin → Radia Perlman (People Ops Manager)
+  ('00000000-0000-0000-0000-000000000000',
+   'bbbb0000-0000-0000-0000-000000000004',
+   'authenticated', 'authenticated',
+   'radia@acme.test',
+   crypt('Password1!', gen_salt('bf')),
+   NOW(),
+   '{"role":"hr_admin","tenant_id":"00000000-0000-0000-0000-000000000001","tenant_name":"Acme Corp","name":"Radia Perlman"}',
+   '{}', FALSE, NOW(), NOW()),
+  -- manager → Ada Lovelace (Engineering Lead)
+  ('00000000-0000-0000-0000-000000000000',
+   'bbbb0000-0000-0000-0000-000000000001',
+   'authenticated', 'authenticated',
+   'ada@acme.test',
+   crypt('Password1!', gen_salt('bf')),
+   NOW(),
+   '{"role":"manager","tenant_id":"00000000-0000-0000-0000-000000000001","tenant_name":"Acme Corp","name":"Ada Lovelace"}',
+   '{}', FALSE, NOW(), NOW()),
+  -- department_head → Grace Hopper (Senior Engineer)
+  ('00000000-0000-0000-0000-000000000000',
+   'bbbb0000-0000-0000-0000-000000000002',
+   'authenticated', 'authenticated',
+   'grace@acme.test',
+   crypt('Password1!', gen_salt('bf')),
+   NOW(),
+   '{"role":"department_head","tenant_id":"00000000-0000-0000-0000-000000000001","tenant_name":"Acme Corp","name":"Grace Hopper"}',
+   '{}', FALSE, NOW(), NOW()),
+  -- employee → Alan Turing (Engineer)
+  ('00000000-0000-0000-0000-000000000000',
+   'bbbb0000-0000-0000-0000-000000000003',
+   'authenticated', 'authenticated',
+   'alan@acme.test',
+   crypt('Password1!', gen_salt('bf')),
+   NOW(),
+   '{"role":"employee","tenant_id":"00000000-0000-0000-0000-000000000001","tenant_name":"Acme Corp","name":"Alan Turing"}',
+   '{}', FALSE, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- auth.identities — required for email/password sign-in (GoTrue validates these)
+INSERT INTO auth.identities (
+  id, user_id, provider_id, provider, identity_data,
+  last_sign_in_at, created_at, updated_at
+) VALUES
+  (gen_random_uuid(), 'ffff0000-0000-0000-0000-000000000001', 'admin@acme.test',   'email', '{"sub":"ffff0000-0000-0000-0000-000000000001","email":"admin@acme.test"}',   NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'bbbb0000-0000-0000-0000-000000000004', 'radia@acme.test',   'email', '{"sub":"bbbb0000-0000-0000-0000-000000000004","email":"radia@acme.test"}',   NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'bbbb0000-0000-0000-0000-000000000001', 'ada@acme.test',     'email', '{"sub":"bbbb0000-0000-0000-0000-000000000001","email":"ada@acme.test"}',     NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'bbbb0000-0000-0000-0000-000000000002', 'grace@acme.test',   'email', '{"sub":"bbbb0000-0000-0000-0000-000000000002","email":"grace@acme.test"}',   NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'bbbb0000-0000-0000-0000-000000000003', 'alan@acme.test',    'email', '{"sub":"bbbb0000-0000-0000-0000-000000000003","email":"alan@acme.test"}',    NOW(), NOW(), NOW())
+ON CONFLICT DO NOTHING;
+
 -- ── Entity definitions ───────────────────────────────────────────────────────────
 INSERT INTO entity_definitions (name, label, resource, tool_ops) VALUES
   ('people', 'Employees', 'employees',
