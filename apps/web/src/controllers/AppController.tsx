@@ -1,9 +1,11 @@
 import { useSidebarStore } from '../stores/sidebar.store';
 import { useAuthStore } from '../stores/auth.store';
+import { useAdminSurfaceStore } from '../stores/admin-surface.store';
 import { AppLayout } from '../views/layout/AppLayout';
 import { ActiveWorkflowsController } from './ActiveWorkflowsController';
 import { PendingApprovalsController } from './PendingApprovalsController';
 import { RecentEntitiesController } from './RecentEntitiesController';
+import { SchemaBuilderController } from './SchemaBuilderController';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
@@ -25,22 +27,27 @@ export function AppController({ children }: Props) {
     setActivePanel, toggleCollapse, setPendingCount,
   } = useSidebarStore();
   const { user, clearAuth } = useAuthStore();
+  const { surface, openSurface, closeSurface } = useAdminSurfaceStore();
 
   // setPendingCount is fed by the PendingApprovalsController via useApprovals hook
   void setPendingCount;
 
   return (
-    <AppLayout
-      activePanel={activePanel}
-      isCollapsed={isCollapsed}
-      pendingApprovalCount={pendingApprovalCount}
-      user={user}
-      sidebarContent={resolveSidebarContent(activePanel)}
-      onPanelChange={setActivePanel}
-      onToggleCollapse={toggleCollapse}
-      onSignOut={clearAuth}
-    >
-      {children}
-    </AppLayout>
+    <>
+      <AppLayout
+        activePanel={activePanel}
+        isCollapsed={isCollapsed}
+        pendingApprovalCount={pendingApprovalCount}
+        user={user}
+        sidebarContent={resolveSidebarContent(activePanel)}
+        onPanelChange={setActivePanel}
+        onToggleCollapse={toggleCollapse}
+        onSignOut={clearAuth}
+        onOpenSchemaBuilder={() => openSurface('schema-builder')}
+      >
+        {children}
+      </AppLayout>
+      {surface === 'schema-builder' && <SchemaBuilderController onClose={closeSurface} />}
+    </>
   );
 }

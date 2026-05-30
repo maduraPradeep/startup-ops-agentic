@@ -69,8 +69,12 @@ Status legend: ✅ done · 🟡 partial · ⬜ not started. The **backend compil
    `verifyBearer` enforces it on **both HTTP and WS connect** (spec §11.1). App-layer
    `authorize()` RBAC unchanged. Degrades gracefully (in-memory denylist when Redis absent).
    See `PHASE-1B-AUTH-SLICE-SUMMARY.md`.
-7. 🟡 **Schema Builder API + UI** — API done (`SchemaBuilderService`, 409-conflict + PUT,
-   `POST/PUT /api/v1/admin/schema/:entity/fields`); **UI deferred**.
+7. ✅ **Schema Builder API + UI** — API done (`SchemaBuilderService`, 409-conflict + PUT,
+   `POST/PUT /api/v1/admin/schema/:entity/fields`). UI now landed: a full-page admin overlay
+   (`SchemaBuilderController` + `views/admin/schema/*`, opened from the sidebar via
+   `admin-surface.store`) — entity picker, merged Tier1/Tier2 field table (system fields
+   read-only), add/edit drawer with inline 409/404/400 surfacing. See
+   `PHASE-1B-SCHEMA-BUILDER-UI-SLICE-SUMMARY.md`.
 8. ⬜ **Skill Editor UI** (token autocomplete, compile button, visual validation panel).
    *(autocomplete backend done via `/admin/skills/tokens/resolve`)*
 9. ✅ **`POST /admin/skills/compile`** wired to `@ops/compiler` with `ClaudeLLM`.
