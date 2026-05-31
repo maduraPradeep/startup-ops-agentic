@@ -17,7 +17,7 @@ describe('SkillCompilerService.compile', () => {
     const llm = new MockLLM(ADD_EMPLOYEE_DEFINITION);
     const service = new SkillCompilerService(new MockRegistry(), llm);
 
-    const result = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
+    const { result } = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.from_cache).toBe(false);
@@ -30,8 +30,8 @@ describe('SkillCompilerService.compile', () => {
     const llm = new MockLLM(ADD_EMPLOYEE_DEFINITION);
     const service = new SkillCompilerService(new MockRegistry(), llm);
 
-    const first = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
-    const second = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
+    const { result: first } = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
+    const { result: second } = await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
 
     expect(first.success && second.success).toBe(true);
     if (second.success) expect(second.from_cache).toBe(true);
@@ -40,7 +40,7 @@ describe('SkillCompilerService.compile', () => {
 
   it('persists only real (non-cache-hit) compilations to the store', async () => {
     const llm = new MockLLM(ADD_EMPLOYEE_DEFINITION);
-    const store: CompilationStore = { save: vi.fn(async () => {}) };
+    const store: CompilationStore = { save: vi.fn(async () => null) };
     const service = new SkillCompilerService(new MockRegistry(), llm, { store });
 
     await service.compile({ tenantId: TENANT, skillText: ADD_EMPLOYEE_SKILL });
@@ -52,7 +52,7 @@ describe('SkillCompilerService.compile', () => {
     const llm = new MockLLM(ADD_EMPLOYEE_DEFINITION);
     const service = new SkillCompilerService(new MockRegistry(), llm);
 
-    const result = await service.compile({ tenantId: TENANT, skillText: UNKNOWN_ENTITY_SKILL });
+    const { result } = await service.compile({ tenantId: TENANT, skillText: UNKNOWN_ENTITY_SKILL });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.stage).toBe('parse');
     expect(llm.callCount).toBe(0); // failed before reaching the LLM

@@ -18,14 +18,26 @@ import {
 // writes each result to `skill_compilations` keyed by compilation_hash.
 
 export interface CompilationStore {
-  /** Persist a compilation result for a tenant (idempotent on (tenant, hash)). */
-  save(tenantId: string, result: CompilationResult): Promise<void>;
+  /**
+   * Persist a compilation result for a tenant (idempotent on (tenant, hash)). Optionally
+   * binds the row to a skill. Returns the persisted `skill_compilations.id` (or null when
+   * the row carries no addressable id, e.g. the failed-compilation sentinel).
+   */
+  save(tenantId: string, result: CompilationResult, skillId?: string): Promise<string | null>;
 }
 
 export interface CompileRequest {
   tenantId: string;
   skillText: string;
   authorRole?: string;
+  /** When set, the compilation is bound to this saved skill (drives lifecycle linkage). */
+  skillId?: string;
+}
+
+/** A compile call's result plus the persisted compilation id (when a store is configured). */
+export interface CompileOutcome {
+  result: CompilationResult;
+  compilationId: string | null;
 }
 
 export type TokenResolveResult =
@@ -45,7 +57,7 @@ export class SkillCompilerService {
     this.store = opts.store;
   }
 
-  async compile(req: CompileRequest): Promise<CompilationResult> {
+  async compile(req: CompileRequest): Promise<CompileOutcome> {
     const result = await compileSkill(req.skillText, {
       llm: this.llm,
       registry: this.registry,
@@ -56,10 +68,11 @@ export class SkillCompilerService {
     // Persist real (non-cache-hit) compilations; a cache hit was already stored.
     // Failures are never cached by the pipeline, so they are always recorded.
     const isCacheHit = result.success && result.from_cache;
+    let compilationId: string | null = null;
     if (this.store && !isCacheHit) {
-      await this.store.save(req.tenantId, result);
+      compilationId = await this.store.save(req.tenantId, result, req.skillId);
     }
-    return result;
+    return { result, compilationId };
   }
 
   /** Parse + resolve tokens for editor autocomplete (POST /admin/skills/tokens/resolve). */

@@ -167,14 +167,14 @@ Make compiled skills actually run against a real LangGraph service.
 |---|-------------|
 | 1 | Install `langgraph`; enable `LangGraphBackend`; wire `PostgresSaver` against Supabase. |
 | 2 | Step handlers for all step types: `collect`, `enrich`, `entity_tool`, `notify`, `start_agent`, `condition`, `human_input`, `end`. |
-| 3 | Skill lifecycle: `draft → compiled → validated → live → archived`. |
-| 4 | `POST /admin/skills/{publish,validate,rollback,fork/:id}` lifecycle routes. |
+| 3 | ✅ **Done.** Skill lifecycle: `draft → compiled → validated → live → archived` (migration 006, pure `skill-lifecycle.ts` state machine + `SkillService`/`SkillStore`). |
+| 4 | ✅ **Done (fork deferred to #7).** CRUD + lifecycle routes under `/admin/skills`: `GET`/`POST`/`GET :id`/`PATCH :id` + `POST :id/{validate,publish,rollback,archive,restore}`. `fork/:id` lands with default skills (#7). |
 | 5 | `ExecutionState` machine over the wire; `awaiting_human_input` vs `awaiting_approval`. |
 | 6 | Compilation cache at rest in `skill_compilations` table (7-day window, keyed by `compilation_hash`). |
 | 7 | Default skills: Leave Request and Employee Onboarding authored as `default_skills` rows. |
 | 8 | WebSocket + SSE fallback for real-time execution state streaming. |
 | 9 | Single-role approval flow: `POST /workflows/:id/approve`. |
-| 10 | Rollback: `live_compilation_id` / `previous_compilation_id` swap; in-flight executions unaffected (pinned compilation). |
+| 10 | ✅ **Pointer swap done (execution pinning pending bridge).** Rollback swaps `live_compilation_id` / `previous_compilation_id`; in-flight-execution pinning lands with the execution bridge. |
 | 11 | `SkillEditor` lifecycle controls; `WorkflowStatusCard` and `ApprovalCard` UI components. |
 
 **Execution flow:**

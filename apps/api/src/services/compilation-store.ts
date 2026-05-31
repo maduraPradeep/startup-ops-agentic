@@ -9,36 +9,47 @@ import type { CompilationStore } from './skill-compiler.service';
 export class PostgresCompilationStore implements CompilationStore {
   constructor(private readonly client: SupabaseClient) {}
 
-  async save(tenantId: string, result: CompilationResult): Promise<void> {
+  async save(
+    tenantId: string,
+    result: CompilationResult,
+    skillId?: string,
+  ): Promise<string | null> {
     if (result.success) {
-      await this.client.query(
+      const rows = await this.client.query<{ id: string }>(
         `INSERT INTO skill_compilations
-           (tenant_id, compilation_hash, success, langgraph_def, react_flow_graph, warnings, error)
-         VALUES ($1, $2, TRUE, $3, $4, $5, NULL)
+           (tenant_id, skill_id, compilation_hash, success, langgraph_def, react_flow_graph, warnings, error)
+         VALUES ($1, $2, $3, TRUE, $4, $5, $6, NULL)
          ON CONFLICT (tenant_id, compilation_hash) DO UPDATE SET
+           skill_id         = COALESCE(EXCLUDED.skill_id, skill_compilations.skill_id),
            langgraph_def    = EXCLUDED.langgraph_def,
            react_flow_graph = EXCLUDED.react_flow_graph,
-           warnings         = EXCLUDED.warnings`,
+           warnings         = EXCLUDED.warnings
+         RETURNING id`,
         [
           tenantId,
+          skillId ?? null,
           result.compilation_hash,
           JSON.stringify(result.langgraph_def),
           JSON.stringify(result.react_flow_graph),
           JSON.stringify(result.warnings),
         ],
       );
-      return;
+      return rows[0]?.id ?? null;
     }
 
     // Failed compilation: the error shape has no compilation_hash. Record the latest
-    // failure per tenant for audit, keyed by an all-zero sentinel hash.
+    // failure per tenant for audit, keyed by an all-zero sentinel hash. A failure is never
+    // an addressable candidate, so we report no id.
     await this.client.query(
       `INSERT INTO skill_compilations
-         (tenant_id, compilation_hash, success, langgraph_def, react_flow_graph, warnings, error)
-       VALUES ($1, $2, FALSE, NULL, NULL, '[]', $3)
-       ON CONFLICT (tenant_id, compilation_hash) DO UPDATE SET error = EXCLUDED.error`,
-      [tenantId, FAILED_HASH_SENTINEL, JSON.stringify(result)],
+         (tenant_id, skill_id, compilation_hash, success, langgraph_def, react_flow_graph, warnings, error)
+       VALUES ($1, $2, $3, FALSE, NULL, NULL, '[]', $4)
+       ON CONFLICT (tenant_id, compilation_hash) DO UPDATE SET
+         skill_id = COALESCE(EXCLUDED.skill_id, skill_compilations.skill_id),
+         error    = EXCLUDED.error`,
+      [tenantId, skillId ?? null, FAILED_HASH_SENTINEL, JSON.stringify(result)],
     );
+    return null;
   }
 }
 
