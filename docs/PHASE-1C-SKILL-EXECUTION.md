@@ -48,8 +48,13 @@ skills, real-time updates, single-role approvals, and rollback.
    per-node. See `PHASE-1C-STEP-HANDLERS-SLICE-SUMMARY.md`. _(No real langgraph runtime / no
    PostgresSaver yet — that is deliverable #1, the next slice.)_
 3. **Skill lifecycle** — `draft → compiled → validated → live → archived` (spec §4.7).
-4. **`ExecutionState` machine over the wire** — distinguish `awaiting_human_input` vs
-   `awaiting_approval`; persist `current_state` on `skill_executions`.
+4. **`ExecutionState` machine over the wire** — ✅ **Done (2026-05-31).** The TS↔Python
+   execution bridge runs a live skill's `live_compilation_id` against the Python runtime and
+   persists `state` + merged `context` on `skill_executions` per transition, pinned to the
+   compilation it started on. Distinguishes `awaiting_human_input` vs `awaiting_approval` (the
+   runtime parks at the right state; the pause's `paused_kind` is carried in the snapshot).
+   `POST /skills/:id/execute` + `/executions/:id/resume` + `GET /executions[/:id]`. See
+   `PHASE-1C-EXECUTION-BRIDGE-SLICE-SUMMARY.md`.
 5. **Compilation cache at rest** — move the in-memory cache to the `skill_compilations` table
    keyed by `compilation_hash` with a 7-day window (spec §4.4 caching SQL).
 6. **Default skills** — author Leave Request & Employee Onboarding as `default_skills` rows;
@@ -67,8 +72,8 @@ skills, real-time updates, single-role approvals, and rollback.
 |------|-------|
 | Runtime | ✅ `graph_builder/handlers.py` (closures); ✅ `graph_builder/langgraph_backend.py` (real `StateGraph`) + `graph_builder/langgraph_executor.py` (run/resume) |
 | Checkpointer | ✅ `graph_builder/postgres_checkpointer.py` (langgraph's `PostgresSaver` binding + DSN/reachability helpers); `MemorySaver` for tests |
-| Service bridge | `apps/api/src/services/skill-executor.service.ts` (trigger → call Python → stream state) |
-| Lifecycle | `routes/skills/{publish,validate,rollback,execute,fork}.ts` |
+| Service bridge | ✅ `apps/api/src/services/skill-executor.service.ts` (trigger → call Python → persist state) + `execution-store.ts` + `langgraph-runtime.ts` (HTTP); Python `graph_builder/execution_service.py` + `/executions` endpoints |
+| Lifecycle | ✅ `routes/skills/index.ts` (publish/validate/rollback/execute/resume); `fork` pending |
 | Real-time | `plugins/websocket.plugin.ts` (user-msg vs ping handling), SSE route |
 | Web | `SkillEditor` lifecycle controls; `WorkflowStatusCard`, `ApprovalCard` |
 

@@ -12,6 +12,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from graph_builder import ExecutionService
+
 app = FastAPI(title="Ops Platform — LangGraph Service", version="0.1.0")
 
 app.add_middleware(
@@ -23,6 +25,11 @@ app.add_middleware(
 
 # ── In-memory workflow state (replace with LangGraph persistence) ──────────
 _workflows: dict[str, dict] = {}
+
+# ── Phase 1c skill-execution bridge ─────────────────────────────────────────
+# Drives compiled skills (langgraph_def) sent by the TS gateway. Uses the real langgraph backend
+# when installed, else the in-memory ExecutionRunner — pause/resume works either way.
+_executions = ExecutionService()
 
 
 # ── Request / response models ──────────────────────────────────────────────
@@ -47,6 +54,15 @@ class ActionRequest(BaseModel):
 class CancelRequest(BaseModel):
     actor: dict[str, Any]
     tenantId: str
+
+
+class StartExecutionRequest(BaseModel):
+    """Trigger a compiled skill. ``definition`` is the @ops/compiler ``langgraph_def``."""
+
+    definition: dict[str, Any]
+    initial_state: dict[str, Any] | None = None
+    execution_id: str | None = None  # the gateway's skill_executions row id (shared id)
+    tenant_id: str | None = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -143,6 +159,40 @@ async def get_workflow(workflow_id: str) -> dict:
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return wf
+
+
+# ── Skill execution (Phase 1c bridge) ───────────────────────────────────────
+
+@app.post("/executions")
+async def start_execution(body: StartExecutionRequest) -> dict:
+    """Build + run a compiled skill; return the execution snapshot (state + pause point)."""
+    try:
+        snapshot = _executions.start(
+            body.definition,
+            initial_state=body.initial_state,
+            execution_id=body.execution_id,
+            tenant_id=body.tenant_id,
+        )
+    except ValueError as exc:  # IR validation failed
+        raise HTTPException(status_code=400, detail=str(exc))
+    return snapshot.to_dict()
+
+
+@app.post("/executions/{execution_id}/resume")
+async def resume_execution(execution_id: str) -> dict:
+    """Advance a parked run past one interrupt (human input / approval gate)."""
+    try:
+        return _executions.resume(execution_id).to_dict()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+
+@app.get("/executions/{execution_id}")
+async def get_execution(execution_id: str) -> dict:
+    try:
+        return _executions.get(execution_id).to_dict()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Execution not found")
 
 
 @app.post("/workflows/{workflow_id}/cancel")

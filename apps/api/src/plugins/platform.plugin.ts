@@ -19,13 +19,26 @@ import {
 } from '../services/entity-store.js';
 import { SkillCompilerService } from '../services/skill-compiler.service.js';
 import { ClaudeLLM } from '../services/claude-llm.js';
-import { PostgresCompilationStore } from '../services/compilation-store.js';
+import {
+  PostgresCompilationStore,
+  NullCompilationReader,
+} from '../services/compilation-store.js';
 import { SkillService } from '../services/skill.service.js';
 import {
   PostgresSkillStore,
   InMemorySkillStore,
   type SkillStore,
 } from '../services/skill-store.js';
+import {
+  SkillExecutorService,
+  type CompilationReader,
+} from '../services/skill-executor.service.js';
+import {
+  PostgresExecutionStore,
+  InMemoryExecutionStore,
+  type ExecutionStore,
+} from '../services/execution-store.js';
+import { HttpSkillExecutionRuntime } from '../services/langgraph-runtime.js';
 
 // Phase 1b — wires the compile slice into Fastify.
 //
@@ -44,6 +57,7 @@ declare module 'fastify' {
     entities: EntityService;
     skillCompiler: SkillCompilerService | null;
     skills: SkillService;
+    skillExecutor: SkillExecutorService;
   }
 }
 
@@ -55,6 +69,8 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
   let entityStore: EntityStore;
   let skillStore: SkillStore;
   let compilationStore: PostgresCompilationStore | undefined;
+  let executionStore: ExecutionStore;
+  let compilationReader: CompilationReader;
 
   let db: SupabaseClient | null = null;
   if (connectionString) {
@@ -65,6 +81,8 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
     entityStore = new PostgresEntityStore(client);
     skillStore = new PostgresSkillStore(client);
     compilationStore = new PostgresCompilationStore(client);
+    compilationReader = compilationStore;
+    executionStore = new PostgresExecutionStore(client);
     fastify.addHook('onClose', async () => {
       await client.close();
     });
@@ -74,6 +92,8 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
     tenantFields = new InMemoryTenantFieldStore();
     entityStore = new InMemoryEntityStore();
     skillStore = new InMemorySkillStore();
+    compilationReader = new NullCompilationReader();
+    executionStore = new InMemoryExecutionStore();
     fastify.log.warn('[platform] no DB configured — using MockRegistry + in-memory stores');
   }
   fastify.decorate('db', db);
@@ -86,6 +106,12 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
   const schemaBuilder = new SchemaBuilderService(registry, tenantFields, schemaRegistry);
   const entities = new EntityService(schemaRegistry, entityStore);
   const skills = new SkillService(skillStore);
+  const skillExecutor = new SkillExecutorService(
+    skills,
+    compilationReader,
+    new HttpSkillExecutionRuntime(),
+    executionStore,
+  );
 
   let skillCompiler: SkillCompilerService | null = null;
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -102,4 +128,5 @@ export const platformPlugin = fp(async (fastify: FastifyInstance) => {
   fastify.decorate('entities', entities);
   fastify.decorate('skillCompiler', skillCompiler);
   fastify.decorate('skills', skills);
+  fastify.decorate('skillExecutor', skillExecutor);
 });

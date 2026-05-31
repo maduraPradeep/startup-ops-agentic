@@ -1,4 +1,5 @@
 import { createVerifier } from 'fast-jwt';
+import { createPublicKey } from 'crypto';
 import { ROLES } from '@ops/shared';
 import type { TokenDenylist } from './token-denylist';
 
@@ -74,10 +75,10 @@ export function mapGoTrueClaims(claims: GoTrueClaims): VerifiedIdentity {
 }
 
 /**
- * Verifies a Supabase-issued JWT against the project secret. Throws (fast-jwt error) on a bad
- * signature, expiry, or audience mismatch. Returns the mapped identity on success.
+ * Verifies a Supabase-issued JWT. Returns the mapped identity on success.
+ * Async to support both JWKS (ES256, key lookup by kid) and HS256 paths.
  */
-export type SupabaseTokenVerifier = (token: string) => VerifiedIdentity;
+export type SupabaseTokenVerifier = (token: string) => Promise<VerifiedIdentity>;
 
 export interface SupabaseVerifierOptions {
   secret: string;
@@ -85,14 +86,69 @@ export interface SupabaseVerifierOptions {
   audience?: string;
 }
 
+/** HS256 path — used when SUPABASE_JWT_SECRET is set and no EC keys were found in JWKS. */
 export function createSupabaseVerifier(opts: SupabaseVerifierOptions): SupabaseTokenVerifier {
   const verify = createVerifier({
     key: opts.secret,
     algorithms: ['HS256'],
     allowedAud: opts.audience ?? 'authenticated',
   });
-  return (token: string): VerifiedIdentity => {
+  return async (token: string): Promise<VerifiedIdentity> => {
     const claims = verify(token) as GoTrueClaims;
+    return mapGoTrueClaims(claims);
+  };
+}
+
+interface JwkEntry {
+  kid: string;
+  /** PEM-encoded public key — fast-jwt requires a string/Buffer, not a KeyObject. */
+  pem: string;
+}
+
+/**
+ * Fetch the JWKS document from Supabase and return parsed key entries.
+ * Skips non-EC / non-sig keys silently.
+ */
+export async function fetchJwks(jwksUrl: string): Promise<JwkEntry[]> {
+  const res = await fetch(jwksUrl);
+  if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status} ${jwksUrl}`);
+  const { keys } = (await res.json()) as { keys: Array<Record<string, unknown>> };
+  return keys
+    .filter((k) => k.use === 'sig' && k.kty === 'EC')
+    .map((k) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const keyObj = createPublicKey({ key: k as any, format: 'jwk' });
+      return {
+        kid: k.kid as string,
+        pem: keyObj.export({ type: 'spki', format: 'pem' }) as string,
+      };
+    });
+}
+
+/**
+ * ES256 path — used when Supabase is configured to issue asymmetric (EC) JWTs.
+ * Keys are resolved by `kid` from the pre-fetched JWKS.
+ */
+export function createSupabaseVerifierFromJwks(
+  keys: JwkEntry[],
+  audience?: string,
+): SupabaseTokenVerifier {
+  const keyMap = new Map(keys.map((k) => [k.kid, k.pem]));
+
+  const verify = createVerifier({
+    // fast-jwt passes the full decoded object {header, payload, signature} to the key callback
+    key: async (decoded: { header: Record<string, unknown> }) => {
+      const kid = decoded.header?.kid as string | undefined;
+      const pem = keyMap.get(kid ?? '');
+      if (!pem) throw new Error(`Unknown kid: ${kid}`);
+      return pem;
+    },
+    algorithms: ['ES256'],
+    allowedAud: audience ?? 'authenticated',
+  });
+
+  return async (token: string): Promise<VerifiedIdentity> => {
+    const claims = (await verify(token)) as GoTrueClaims;
     return mapGoTrueClaims(claims);
   };
 }

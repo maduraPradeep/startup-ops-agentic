@@ -5,6 +5,12 @@ import {
   SkillNotFoundError,
   SkillPreconditionError,
 } from '../services/skill.service.js';
+import {
+  CompilationNotFoundError,
+  ExecutionNotFoundError,
+  ExecutionRuntimeError,
+  SkillNotExecutableError,
+} from '../services/skill-executor.service.js';
 
 // Phase 1b — POST /admin/skills/compile + /admin/skills/tokens/resolve (spec §10.2).
 // Phase 1c — skill CRUD + lifecycle routes (spec §4.7, PRD §8.4): create/list/get/update +
@@ -22,6 +28,19 @@ function sendError(reply: FastifyReply, err: unknown): boolean {
   }
   if (err instanceof SkillPreconditionError) {
     reply.status(400).send({ error: err.message });
+    return true;
+  }
+  if (err instanceof ExecutionNotFoundError || err instanceof CompilationNotFoundError) {
+    reply.status(404).send({ error: err.message });
+    return true;
+  }
+  if (err instanceof SkillNotExecutableError) {
+    reply.status(409).send({ error: err.message });
+    return true;
+  }
+  if (err instanceof ExecutionRuntimeError) {
+    // The Python runtime is unreachable / errored — a bad gateway, not a client error.
+    reply.status(502).send({ error: err.message });
     return true;
   }
   return false;
@@ -126,6 +145,46 @@ export function createSkillController(fastify: FastifyInstance) {
         if (sendError(reply, err)) return;
         throw err;
       }
+    },
+
+    // ----- Execution bridge (Phase 1c) -------------------------------------------------
+
+    async execute(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string };
+      const { initial_state } = (request.body ?? {}) as {
+        initial_state?: Record<string, unknown>;
+      };
+      try {
+        const record = await fastify.skillExecutor.trigger(request.tenantId, id, initial_state);
+        return reply.status(202).send(record);
+      } catch (err) {
+        if (sendError(reply, err)) return;
+        throw err;
+      }
+    },
+
+    async resumeExecution(request: FastifyRequest, reply: FastifyReply) {
+      const { execId } = request.params as { execId: string };
+      try {
+        return reply.send(await fastify.skillExecutor.resume(request.tenantId, execId));
+      } catch (err) {
+        if (sendError(reply, err)) return;
+        throw err;
+      }
+    },
+
+    async getExecution(request: FastifyRequest, reply: FastifyReply) {
+      const { execId } = request.params as { execId: string };
+      try {
+        return reply.send(await fastify.skillExecutor.get(request.tenantId, execId));
+      } catch (err) {
+        if (sendError(reply, err)) return;
+        throw err;
+      }
+    },
+
+    async listExecutions(request: FastifyRequest, reply: FastifyReply) {
+      return reply.send({ data: await fastify.skillExecutor.list(request.tenantId) });
     },
 
     // ----- Lifecycle transitions (Phase 1c) --------------------------------------------

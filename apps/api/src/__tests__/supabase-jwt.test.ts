@@ -79,35 +79,35 @@ describe('mapGoTrueClaims', () => {
 describe('createSupabaseVerifier', () => {
   const verify = createSupabaseVerifier({ secret: SECRET });
 
-  it('accepts a valid GoTrue token and maps claims', () => {
+  it('accepts a valid GoTrue token and maps claims', async () => {
     const token = sign({
       sub: 'user-1',
       email: 'dev@acme.com',
       session_id: 'sess-1',
       app_metadata: { role: ROLES.HR_ADMIN, tenant_id: TENANT, tenant_name: 'Acme' },
     });
-    const id = verify(token);
+    const id = await verify(token);
     expect(id.userId).toBe('user-1');
     expect(id.role).toBe(ROLES.HR_ADMIN);
     expect(id.tenant_id).toBe(TENANT);
     expect(id.revocationKey).toBe('sess-1');
   });
 
-  it('rejects a token signed with the wrong secret', () => {
+  it('rejects a token signed with the wrong secret', async () => {
     const token = sign({ sub: 'u', session_id: 's' }, 'wrong-secret');
-    expect(() => verify(token)).toThrow();
+    await expect(verify(token)).rejects.toThrow();
   });
 
-  it('rejects an expired token', () => {
+  it('rejects an expired token', async () => {
     const now = Math.floor(Date.now() / 1000);
     const signer = createSigner({ key: SECRET, algorithm: 'HS256' });
     const token = signer({ sub: 'u', aud: 'authenticated', session_id: 's', exp: now - 10 });
-    expect(() => verify(token)).toThrow();
+    await expect(verify(token)).rejects.toThrow();
   });
 
-  it('rejects a token with the wrong audience', () => {
+  it('rejects a token with the wrong audience', async () => {
     const token = sign({ sub: 'u', session_id: 's', aud: 'other' });
-    expect(() => verify(token)).toThrow();
+    await expect(verify(token)).rejects.toThrow();
   });
 });
 

@@ -2,6 +2,7 @@
 
 from .builder import build_graph, validate
 from .checkpointer import InMemoryCheckpointer
+from .execution_service import ExecutionService, ExecutionSnapshot
 from .execution_state import ExecutionState
 from .fakes import (
     InMemoryEntityClient,
@@ -37,6 +38,8 @@ __all__ = [
     "InMemoryGraph",
     "InMemoryCheckpointer",
     "ExecutionState",
+    "ExecutionService",
+    "ExecutionSnapshot",
     "ExecutionRunner",
     "LangGraphBackend",
     "LangGraphCompiledGraph",

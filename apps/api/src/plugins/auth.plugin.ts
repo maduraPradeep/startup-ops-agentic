@@ -9,6 +9,8 @@ import {
 } from '../services/token-denylist.js';
 import {
   createSupabaseVerifier,
+  createSupabaseVerifierFromJwks,
+  fetchJwks,
   extractBearer,
   type SupabaseTokenVerifier,
   type VerifiedIdentity,
@@ -70,27 +72,44 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
     : new InMemoryTokenDenylist();
   fastify.decorate('tokenDenylist', denylist);
 
-  // Supabase GoTrue verification — only when a secret is configured. Absent → legacy fallback.
+  // Supabase GoTrue verification — prefer JWKS (ES256) when SUPABASE_URL is set; fall back to
+  // HS256 when only SUPABASE_JWT_SECRET is configured; fall back to legacy @fastify/jwt otherwise.
+  const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseSecret = process.env.SUPABASE_JWT_SECRET;
-  const supabaseVerifier: SupabaseTokenVerifier | null = supabaseSecret
-    ? createSupabaseVerifier({
-        secret: supabaseSecret,
-        audience: process.env.SUPABASE_JWT_AUD ?? 'authenticated',
-      })
-    : null;
-  fastify.decorate('supabaseVerifier', supabaseVerifier);
-  if (supabaseVerifier) {
-    fastify.log.info('[auth] SUPABASE_JWT_SECRET set — verifying GoTrue JWTs');
-  } else {
-    fastify.log.warn('[auth] SUPABASE_JWT_SECRET unset — using legacy @fastify/jwt verification');
+  const audience = process.env.SUPABASE_JWT_AUD ?? 'authenticated';
+
+  let supabaseVerifier: SupabaseTokenVerifier | null = null;
+
+  if (supabaseUrl) {
+    try {
+      const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+      const keys = await fetchJwks(jwksUrl);
+      if (keys.length > 0) {
+        supabaseVerifier = createSupabaseVerifierFromJwks(keys, audience);
+        fastify.log.info(`[auth] JWKS loaded (${keys.length} key(s)) — verifying GoTrue JWTs via ES256`);
+      }
+    } catch (err) {
+      fastify.log.warn({ err }, '[auth] JWKS fetch failed — falling back to HS256');
+    }
   }
+
+  if (!supabaseVerifier && supabaseSecret) {
+    supabaseVerifier = createSupabaseVerifier({ secret: supabaseSecret, audience });
+    fastify.log.info('[auth] SUPABASE_JWT_SECRET set — verifying GoTrue JWTs via HS256');
+  }
+
+  if (!supabaseVerifier) {
+    fastify.log.warn('[auth] No Supabase config — using legacy @fastify/jwt verification');
+  }
+
+  fastify.decorate('supabaseVerifier', supabaseVerifier);
 
   // Shared verification: GoTrue path first (if configured), else legacy @fastify/jwt. BOTH paths
   // then consult the denylist. Throws on invalid/expired/revoked.
   fastify.decorate('verifyBearer', async function (token: string): Promise<VerifiedIdentity> {
     let identity: VerifiedIdentity;
     if (supabaseVerifier) {
-      identity = supabaseVerifier(token); // throws on bad sig / exp / aud
+      identity = await supabaseVerifier(token); // throws on bad sig / exp / aud
     } else {
       const payload = fastify.jwt.verify<TokenPayload>(token); // throws on bad sig / exp
       identity = mapLegacyPayload(payload);
@@ -124,7 +143,8 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
       request.tenantId = identity.tenant_id;
       request.revocationKey = identity.revocationKey;
       request.revocationTtlSeconds = identity.remainingTtlSeconds;
-    } catch {
+    } catch (err) {
+      fastify.log.warn({ err }, '[auth] token verification failed');
       reply.status(401).send({ error: 'Unauthorized' });
     }
   });
