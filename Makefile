@@ -17,6 +17,4 @@ dev-reset:
 	$(COMPOSE) up -d
 
 dev-seed:
-	POSTGRES_CONTAINER=docker-postgres-1 \
-	DIRECTUS_URL=http://localhost:8055 DIRECTUS_ADMIN_TOKEN=dev-admin-token \
-	infrastructure/directus/setup-collections.sh
+	supabase db reset

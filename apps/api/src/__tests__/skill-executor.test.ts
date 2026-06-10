@@ -4,7 +4,9 @@ import { InMemoryExecutionStore } from '../services/execution-store';
 import { InMemorySkillStore } from '../services/skill-store';
 import { SkillService } from '../services/skill.service';
 import {
+  ApprovalForbiddenError,
   CompilationNotFoundError,
+  ExecutionNotAwaitingApprovalError,
   ExecutionNotFoundError,
   ExecutionRuntimeError,
   SkillNotExecutableError,
@@ -197,6 +199,141 @@ describe('SkillExecutorService.resume', () => {
     const exec = await h.executor.trigger(TENANT, id);
     await expect(h.executor.resume(OTHER, exec.id)).rejects.toThrow(ExecutionNotFoundError);
     await expect(h.executor.resume(TENANT, 'ghost')).rejects.toThrow(ExecutionNotFoundError);
+  });
+});
+
+// An approval gate: a human_input node with kind:'approval' that names a required role.
+const DEF_APPROVAL: LangGraphDefinition = {
+  name: 'Approve Spend',
+  description: '',
+  state_schema: { fields: {} },
+  entry_point: 'gate',
+  nodes: [
+    { id: 'gate', step_type: 'human_input', config: { kind: 'approval', approver_role: 'admin' } },
+    { id: 'done', step_type: 'end', config: {} },
+  ],
+  edges: [{ from: 'gate', to: 'done' }],
+} as unknown as LangGraphDefinition;
+
+const ADMIN = { userId: 'u-admin', role: 'admin' };
+
+/** A runtime that parks at awaiting_approval, then resume() drains to completed. */
+class ApprovalRuntime implements SkillExecutionRuntime {
+  resumed: string[] = [];
+  private snapshots = new Map<string, ExecutionSnapshot>();
+
+  async start(input: StartExecutionInput): Promise<ExecutionSnapshot> {
+    const snap: ExecutionSnapshot = {
+      execution_id: input.executionId,
+      state: 'awaiting_approval',
+      data: { ...(input.initialState ?? {}), amount: 5000 },
+      paused_node: 'gate',
+      paused_kind: 'approval',
+      backend: 'inmemory',
+    };
+    this.snapshots.set(input.executionId, snap);
+    return snap;
+  }
+
+  async resume(executionId: string): Promise<ExecutionSnapshot> {
+    this.resumed.push(executionId);
+    const snap: ExecutionSnapshot = {
+      execution_id: executionId,
+      state: 'completed',
+      data: { amount: 5000, approved: true },
+      paused_node: null,
+      paused_kind: null,
+      backend: 'inmemory',
+    };
+    this.snapshots.set(executionId, snap);
+    return snap;
+  }
+
+  async get(executionId: string): Promise<ExecutionSnapshot> {
+    const snap = this.snapshots.get(executionId);
+    if (!snap) throw new Error('unknown');
+    return snap;
+  }
+}
+
+describe('SkillExecutorService.approve', () => {
+  function buildApproval() {
+    const skills = new SkillService(new InMemorySkillStore());
+    const executions = new InMemoryExecutionStore();
+    const runtime = new ApprovalRuntime();
+    const executor = new SkillExecutorService(
+      skills,
+      new FakeCompilationReader({ [COMP]: DEF_APPROVAL }),
+      runtime,
+      executions,
+    );
+    return { skills, executions, runtime, executor };
+  }
+
+  it('advances an awaiting_approval run to completed and records an audit entry', async () => {
+    const h = buildApproval();
+    const id = await liveSkill(h.skills);
+    const exec = await h.executor.trigger(TENANT, id);
+    expect(exec.state).toBe('awaiting_approval');
+
+    const approved = await h.executor.approve(TENANT, exec.id, ADMIN, { decision: 'approve' });
+
+    expect(approved.state).toBe('completed');
+    expect(approved.finished_at).not.toBeNull();
+    expect(h.runtime.resumed).toEqual([exec.id]);
+    expect(approved.context).toMatchObject({ approved: true });
+    expect(approved.context._approvals).toEqual([
+      expect.objectContaining({ node: 'gate', by: 'u-admin', role: 'admin', decision: 'approve' }),
+    ]);
+  });
+
+  it('rejects an awaiting_approval run, cancelling it without resuming', async () => {
+    const h = buildApproval();
+    const id = await liveSkill(h.skills);
+    const exec = await h.executor.trigger(TENANT, id);
+
+    const rejected = await h.executor.approve(TENANT, exec.id, ADMIN, {
+      decision: 'reject',
+      comment: 'over budget',
+    });
+
+    expect(rejected.state).toBe('cancelled');
+    expect(rejected.finished_at).not.toBeNull();
+    expect(h.runtime.resumed).toEqual([]); // no resume on reject
+    expect(rejected.context._approvals).toEqual([
+      expect.objectContaining({ decision: 'reject', comment: 'over budget' }),
+    ]);
+  });
+
+  it('forbids an approver whose role does not match the gate', async () => {
+    const h = buildApproval();
+    const id = await liveSkill(h.skills);
+    const exec = await h.executor.trigger(TENANT, id);
+
+    await expect(
+      h.executor.approve(TENANT, exec.id, { userId: 'u-emp', role: 'employee' }, { decision: 'approve' }),
+    ).rejects.toThrow(ApprovalForbiddenError);
+    expect(h.runtime.resumed).toEqual([]);
+  });
+
+  it('throws when the run is not awaiting approval', async () => {
+    // The default FakeRuntime parks at awaiting_human_input, not approval.
+    const h = build();
+    const id = await liveSkill(h.skills);
+    const exec = await h.executor.trigger(TENANT, id);
+
+    await expect(
+      h.executor.approve(TENANT, exec.id, ADMIN, { decision: 'approve' }),
+    ).rejects.toThrow(ExecutionNotAwaitingApprovalError);
+  });
+
+  it('throws ExecutionNotFoundError for an unknown / cross-tenant execution', async () => {
+    const h = buildApproval();
+    const id = await liveSkill(h.skills);
+    const exec = await h.executor.trigger(TENANT, id);
+    await expect(h.executor.approve(OTHER, exec.id, ADMIN, { decision: 'approve' })).rejects.toThrow(
+      ExecutionNotFoundError,
+    );
   });
 });
 

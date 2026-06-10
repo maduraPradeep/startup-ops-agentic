@@ -6,7 +6,9 @@ import {
   SkillPreconditionError,
 } from '../services/skill.service.js';
 import {
+  ApprovalForbiddenError,
   CompilationNotFoundError,
+  ExecutionNotAwaitingApprovalError,
   ExecutionNotFoundError,
   ExecutionRuntimeError,
   SkillNotExecutableError,
@@ -34,8 +36,12 @@ function sendError(reply: FastifyReply, err: unknown): boolean {
     reply.status(404).send({ error: err.message });
     return true;
   }
-  if (err instanceof SkillNotExecutableError) {
+  if (err instanceof SkillNotExecutableError || err instanceof ExecutionNotAwaitingApprovalError) {
     reply.status(409).send({ error: err.message });
+    return true;
+  }
+  if (err instanceof ApprovalForbiddenError) {
+    reply.status(403).send({ error: err.message });
     return true;
   }
   if (err instanceof ExecutionRuntimeError) {
@@ -167,6 +173,28 @@ export function createSkillController(fastify: FastifyInstance) {
       const { execId } = request.params as { execId: string };
       try {
         return reply.send(await fastify.skillExecutor.resume(request.tenantId, execId));
+      } catch (err) {
+        if (sendError(reply, err)) return;
+        throw err;
+      }
+    },
+
+    async approveExecution(request: FastifyRequest, reply: FastifyReply) {
+      const { execId } = request.params as { execId: string };
+      const { decision, comment } = (request.body ?? {}) as {
+        decision?: string;
+        comment?: string;
+      };
+      if (decision !== undefined && decision !== 'approve' && decision !== 'reject') {
+        return reply.status(400).send({ error: "decision must be 'approve' or 'reject'" });
+      }
+      const approver = { userId: request.user.userId, role: request.user.role };
+      try {
+        const record = await fastify.skillExecutor.approve(request.tenantId, execId, approver, {
+          decision: (decision as 'approve' | 'reject') ?? 'approve',
+          comment,
+        });
+        return reply.send(record);
       } catch (err) {
         if (sendError(reply, err)) return;
         throw err;

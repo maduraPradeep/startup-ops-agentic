@@ -60,7 +60,16 @@ skills, real-time updates, single-role approvals, and rollback.
 6. **Default skills** — author Leave Request & Employee Onboarding as `default_skills` rows;
    implement fork (`POST /admin/skills/fork/:id`) with traceability fields.
 7. **Real-time** — WebSocket + SSE fallback; Redis pub/sub → execution state updates → frontend.
-8. **Single-role approval flow** — `POST /workflows/:id/approve` resolves `awaiting_approval`.
+8. **Single-role approval flow** — ✅ **Done (2026-05-31).** `POST /api/v1/admin/skills/executions/:execId/approve`
+   resolves an `awaiting_approval` gate (the bridge already parks there; this adds the
+   approval-specific route on the execution surface rather than reviving the legacy Directus
+   `/workflows` route). Asserts the run is currently `awaiting_approval` (via the runtime snapshot,
+   which also yields the paused node), enforces a single-role match against the paused node's
+   `config.approver_role` (falling back to `config.target`), and appends an audit entry to
+   `context._approvals` (preserved across later plain resumes). `approve` advances one step;
+   `reject` cancels the run without resuming. Errors: not-awaiting-approval → 409, role mismatch →
+   403, unknown/cross-tenant execution → 404, runtime unreachable → 502. TS-only (no Python change).
+   See `PHASE-1C-APPROVAL-SLICE-SUMMARY.md`.
 9. **Rollback** — `live_compilation_id` / `previous_compilation_id` swap; in-flight executions
    unaffected (pinned compilation).
 

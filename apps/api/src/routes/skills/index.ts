@@ -15,6 +15,7 @@ export const skillRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/executions',                  auth, ctrl.listExecutions);
   fastify.get('/executions/:execId',          auth, ctrl.getExecution);
   fastify.post('/executions/:execId/resume',  auth, ctrl.resumeExecution);
+  fastify.post('/executions/:execId/approve', auth, ctrl.approveExecution);
 
   // CRUD (Phase 1c).
   fastify.get('/',      auth, ctrl.list);

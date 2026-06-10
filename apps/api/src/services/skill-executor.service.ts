@@ -75,6 +75,44 @@ export class ExecutionRuntimeError extends Error {
   }
 }
 
+/** Approve was called on a run that is not parked at an approval gate. */
+export class ExecutionNotAwaitingApprovalError extends Error {
+  constructor(public readonly id: string, public readonly state: string) {
+    super(`Execution ${id} is not awaiting approval (current state: ${state})`);
+    this.name = 'ExecutionNotAwaitingApprovalError';
+  }
+}
+
+/** The approver's role does not satisfy the gate's required role (single-role gate). */
+export class ApprovalForbiddenError extends Error {
+  constructor(public readonly requiredRole: string, public readonly actualRole: string) {
+    super(`Approval requires role '${requiredRole}', but approver has role '${actualRole}'`);
+    this.name = 'ApprovalForbiddenError';
+  }
+}
+
+/** Who is resolving an approval gate (carried from the verified JWT). */
+export interface Approver {
+  userId: string;
+  role: string;
+}
+
+/** An approve/reject decision against a parked approval gate. */
+export interface ApprovalDecision {
+  decision: 'approve' | 'reject';
+  comment?: string;
+}
+
+/** One audit entry appended to `context._approvals` when a gate is resolved. */
+export interface ApprovalAudit {
+  node: string | null;
+  by: string;
+  role: string;
+  decision: 'approve' | 'reject';
+  comment?: string;
+  at: string;
+}
+
 export class SkillExecutorService {
   constructor(
     private readonly skills: SkillService,
@@ -134,14 +172,75 @@ export class SkillExecutorService {
 
   /** Advance a parked execution past one interrupt (provide input / approve). */
   async resume(tenantId: string, executionId: string): Promise<ExecutionRecord> {
-    await this.requireExecution(tenantId, executionId);
+    const record = await this.requireExecution(tenantId, executionId);
     let snapshot: ExecutionSnapshot;
     try {
       snapshot = await this.runtime.resume(executionId);
     } catch (err) {
       throw new ExecutionRuntimeError(`Runtime failed to resume execution ${executionId}`, err);
     }
-    return this.persist(tenantId, executionId, snapshot);
+    // Carry the approval audit forward — a plain resume overwrites `context` with graph state,
+    // which never carries our `_approvals` metadata.
+    return this.persist(tenantId, executionId, snapshot, preservedApprovals(record));
+  }
+
+  /**
+   * Resolve a single-role approval gate (spec §4.8 step 5, deliverable #8). The run must be
+   * parked at `awaiting_approval`; the approver's role must match the gate's required role (the
+   * paused node's `approver_role`/`target`, when set). On `approve` the run advances one step; on
+   * `reject` it is cancelled. Either way an audit entry is appended to `context._approvals`.
+   */
+  async approve(
+    tenantId: string,
+    executionId: string,
+    approver: Approver,
+    { decision, comment }: ApprovalDecision,
+  ): Promise<ExecutionRecord> {
+    const record = await this.requireExecution(tenantId, executionId);
+
+    // The runtime is the source of truth for whether the run is *currently* at an approval gate
+    // and which node it parked on (the persisted row carries state but not the paused node).
+    let parked: ExecutionSnapshot;
+    try {
+      parked = await this.runtime.get(executionId);
+    } catch (err) {
+      throw new ExecutionRuntimeError(`Runtime failed to read execution ${executionId}`, err);
+    }
+    if (parked.state !== 'awaiting_approval') {
+      throw new ExecutionNotAwaitingApprovalError(executionId, parked.state);
+    }
+
+    await this.enforceApproverRole(tenantId, record.compilation_id, parked.paused_node, approver);
+
+    const audit: ApprovalAudit = {
+      node: parked.paused_node,
+      by: approver.userId,
+      role: approver.role,
+      decision,
+      ...(comment !== undefined && { comment }),
+      at: new Date().toISOString(),
+    };
+    const approvals = [...priorApprovals(record), audit];
+
+    // Reject: cancel the run without resuming. Cancelled is terminal.
+    if (decision === 'reject') {
+      const updated = await this.executions.update(tenantId, executionId, {
+        state: 'cancelled',
+        context: { ...parked.data, _approvals: approvals },
+        finishedAt: new Date().toISOString(),
+      });
+      if (!updated) throw new ExecutionNotFoundError(executionId);
+      return updated;
+    }
+
+    // Approve: advance past the one interrupt and persist the audit alongside the new state.
+    let snapshot: ExecutionSnapshot;
+    try {
+      snapshot = await this.runtime.resume(executionId);
+    } catch (err) {
+      throw new ExecutionRuntimeError(`Runtime failed to resume execution ${executionId}`, err);
+    }
+    return this.persist(tenantId, executionId, snapshot, { _approvals: approvals });
   }
 
   get(tenantId: string, executionId: string): Promise<ExecutionRecord> {
@@ -158,21 +257,60 @@ export class SkillExecutorService {
     return record;
   }
 
+  /**
+   * Single-role gate (spec §4.8): the paused approval node may name a required role via
+   * `config.approver_role` (falling back to `config.target`). When set, the approver's role must
+   * match exactly; when unset, any authenticated tenant user may resolve it. A missing
+   * compilation/node is treated as "no requirement" — the awaiting-approval check already gated us.
+   */
+  private async enforceApproverRole(
+    tenantId: string,
+    compilationId: string | null,
+    pausedNode: string | null,
+    approver: Approver,
+  ): Promise<void> {
+    if (!compilationId || !pausedNode) return;
+    const def = await this.compilations.findLangGraphDef(tenantId, compilationId);
+    const node = def?.nodes.find((n) => n.id === pausedNode);
+    if (!node) return;
+    const config = node.config as Record<string, unknown>;
+    const requiredRole =
+      (typeof config.approver_role === 'string' && config.approver_role) ||
+      (typeof config.target === 'string' && config.target) ||
+      null;
+    if (requiredRole && approver.role !== requiredRole) {
+      throw new ApprovalForbiddenError(requiredRole, approver.role);
+    }
+  }
+
   /** Fold a runtime snapshot back into the execution row; stamp `finished_at` when terminal. */
   private async persist(
     tenantId: string,
     id: string,
     snapshot: ExecutionSnapshot,
+    extraContext?: Record<string, unknown>,
   ): Promise<ExecutionRecord> {
     const terminal = TERMINAL_STATES.has(snapshot.state);
     const updated = await this.executions.update(tenantId, id, {
       state: snapshot.state,
-      context: snapshot.data,
+      context: extraContext ? { ...snapshot.data, ...extraContext } : snapshot.data,
       finishedAt: terminal ? new Date().toISOString() : null,
     });
     if (!updated) throw new ExecutionNotFoundError(id);
     return updated;
   }
+}
+
+/** Existing approval audit on a persisted execution row (our metadata, not graph state). */
+function priorApprovals(record: ExecutionRecord): ApprovalAudit[] {
+  const prior = record.context._approvals;
+  return Array.isArray(prior) ? (prior as ApprovalAudit[]) : [];
+}
+
+/** `{ _approvals }` to carry across a plain resume, or undefined when there is none. */
+function preservedApprovals(record: ExecutionRecord): Record<string, unknown> | undefined {
+  const prior = priorApprovals(record);
+  return prior.length > 0 ? { _approvals: prior } : undefined;
 }
 
 export { SkillNotFoundError };
