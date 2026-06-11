@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, GitBranch, Bell, ChevronLeft, LogOut, Table2, Sparkles } from 'lucide-react';
 
 type SidebarPanel = 'workflows' | 'approvals' | 'entities' | 'notifications' | null;
 
@@ -19,6 +19,8 @@ interface Props {
   onPanelChange: (panel: SidebarPanel) => void;
   onToggleCollapse: () => void;
   onSignOut: () => void;
+  onOpenSchemaBuilder?: () => void;
+  onOpenSkillEditor?: () => void;
   children: React.ReactNode;
 }
 
@@ -31,8 +33,11 @@ export function AppLayout({
   onPanelChange,
   onToggleCollapse,
   onSignOut,
+  onOpenSchemaBuilder,
+  onOpenSkillEditor,
   children,
 }: Props) {
+  const showAdmin = Boolean(onOpenSchemaBuilder || onOpenSkillEditor);
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <aside className={clsx(
@@ -74,6 +79,34 @@ export function AppLayout({
             </button>
           ))}
         </nav>
+
+        {showAdmin && (
+          <nav className="flex flex-col gap-1 px-2 py-3 border-b border-gray-100">
+            {!isCollapsed && (
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pb-1">Admin</p>
+            )}
+            {onOpenSchemaBuilder && (
+              <button
+                onClick={onOpenSchemaBuilder}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                title="Schema Builder"
+              >
+                <span className="shrink-0"><Table2 size={18} /></span>
+                {!isCollapsed && <span className="truncate">Schema Builder</span>}
+              </button>
+            )}
+            {onOpenSkillEditor && (
+              <button
+                onClick={onOpenSkillEditor}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                title="Skill Editor"
+              >
+                <span className="shrink-0"><Sparkles size={18} /></span>
+                {!isCollapsed && <span className="truncate">Skill Editor</span>}
+              </button>
+            )}
+          </nav>
+        )}
 
         {!isCollapsed && activePanel && (
           <div className="flex-1 overflow-y-auto">

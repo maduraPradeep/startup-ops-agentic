@@ -1,43 +1,51 @@
-const directusUrl = () => process.env.DIRECTUS_URL ?? 'http://localhost:8055';
+const goTrueUrl = () =>
+  `${process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'}/auth/v1`;
 
-export interface DirectusUser {
+const anonKey = () => process.env.SUPABASE_ANON_KEY ?? '';
+
+function goTrueHeaders() {
+  return { 'Content-Type': 'application/json', apikey: anonKey() };
+}
+
+export interface GoTrueUser {
   id: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
-  role: string;
-  tenant_id?: string;
-  tenant_name?: string;
+  app_metadata: {
+    role?: string;
+    tenant_id?: string;
+    tenant_name?: string;
+    name?: string;
+    [k: string]: unknown;
+  };
+  user_metadata: Record<string, unknown>;
+}
+
+export interface GoTrueSession {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  user: GoTrueUser;
 }
 
 export const AuthModel = {
-  async login(email: string, password: string): Promise<{ access_token: string } | null> {
-    const res = await fetch(`${directusUrl()}/auth/login`, {
+  async login(email: string, password: string): Promise<GoTrueSession | null> {
+    const res = await fetch(`${goTrueUrl()}/token?grant_type=password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: goTrueHeaders(),
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) return null;
-    const body = await res.json() as { data: { access_token: string } };
-    return body.data;
+    return res.json() as Promise<GoTrueSession>;
   },
 
-  async getUser(accessToken: string): Promise<DirectusUser | null> {
-    const res = await fetch(`${directusUrl()}/users/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return null;
-    const body = await res.json() as { data: DirectusUser };
-    return body.data;
-  },
-
-  async refresh(refreshToken: string): Promise<unknown | null> {
-    const res = await fetch(`${directusUrl()}/auth/refresh`, {
+  async refresh(refreshToken: string): Promise<GoTrueSession | null> {
+    const res = await fetch(`${goTrueUrl()}/token?grant_type=refresh_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: goTrueHeaders(),
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
     if (!res.ok) return null;
-    return res.json();
+    return res.json() as Promise<GoTrueSession>;
   },
 };

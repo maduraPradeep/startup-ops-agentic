@@ -9,3 +9,9 @@ coverage/
 .gitnexus
 services/langgraph/.venv/
 .dev-seeded
+supabase/.branches/
+supabase/.temp/
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.pytest_cache/

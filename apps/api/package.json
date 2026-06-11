@@ -10,7 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@directus/sdk": "^17.0.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/jwt": "^10.0.0",
@@ -19,18 +18,22 @@
     "@fastify/redis": "^7.2.0",
     "@fastify/type-provider-typebox": "^6.0.0",
     "@fastify/websocket": "^11.0.0",
+    "@ops/compiler": "workspace:*",
     "@ops/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.0",
     "dotenv": "^17.4.2",
+    "fast-jwt": "6.2.4",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.0",
     "ioredis": "^5.4.1",
+    "pg": "^8.21.0",
     "pino-pretty": "^11.2.1",
     "socket.io": "^4.7.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

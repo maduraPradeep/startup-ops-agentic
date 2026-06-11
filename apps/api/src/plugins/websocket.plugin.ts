@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import { Server } from 'socket.io';
 import type { FastifyInstance } from 'fastify';
+import { extractBearer } from '../services/supabase-jwt.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -16,14 +17,25 @@ export const websocketPlugin = fp(async (fastify: FastifyInstance) => {
     },
   });
 
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
+  // Enforce auth on WS connect: verify the token (GoTrue or legacy) AND reject a revoked
+  // revocation key (spec §11.1). Reuses fastify.verifyBearer so HTTP and WS share one code
+  // path — a token revoked via POST /auth/logout is rejected here too.
+  io.use(async (socket, next) => {
+    const token = extractBearer(socket.handshake.auth.token as string | undefined);
     if (!token) return next(new Error('Authentication required'));
-    next();
+    try {
+      const identity = await fastify.verifyBearer(token); // throws on invalid / expired / revoked
+      // Stash the verified tenant so connection handlers trust it over client-supplied values.
+      socket.data.tenantId = identity.tenant_id;
+      socket.data.userId = identity.userId;
+      next();
+    } catch {
+      next(new Error('Unauthorized'));
+    }
   });
 
   io.on('connection', (socket) => {
-    const tenantId = socket.handshake.auth.tenantId;
+    const tenantId = (socket.data.tenantId as string | undefined) ?? socket.handshake.auth.tenantId;
     if (tenantId) {
       socket.join(`tenant:${tenantId}`);
     }

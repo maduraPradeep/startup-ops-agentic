@@ -1,54 +1,4 @@
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: ops_platform
-      POSTGRES_USER: ops_user
-      POSTGRES_PASSWORD: ops_password
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ../directus/schema/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ops_user -d ops_platform"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  directus:
-    image: directus/directus:11
-    ports:
-      - "8055:8055"
-    environment:
-      SECRET: "dev-secret-change-in-prod"
-      DB_CLIENT: pg
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: ops_platform
-      DB_USER: ops_user
-      DB_PASSWORD: ops_password
-      ADMIN_EMAIL: admin@ops-platform.com
-      ADMIN_PASSWORD: admin123
-      ADMIN_TOKEN: dev-admin-token
-      WEBSOCKETS_ENABLED: "true"
-      EXTENSIONS_AUTO_RELOAD: "true"
-      CORS_ENABLED: "true"
-      CORS_ORIGIN: "true"
-    volumes:
-      - ../directus/extensions:/directus/extensions
-      - ../directus/schema:/directus/schema
-      - directus_dev_uploads:/directus/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8055/server/health | grep -q '\"status\":\"ok\"'"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-
   redis:
     image: redis:7-alpine
     ports:
@@ -58,6 +8,4 @@ services:
       - redis_dev_data:/data
 
 volumes:
-  postgres_dev_data:
-  directus_dev_uploads:
   redis_dev_data:

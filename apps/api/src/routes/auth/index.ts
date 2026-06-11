@@ -6,4 +6,5 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/login',   ctrl.login);
   fastify.post('/refresh', ctrl.refresh);
+  fastify.post('/logout',  { preHandler: fastify.authenticate }, ctrl.logout);
 };
