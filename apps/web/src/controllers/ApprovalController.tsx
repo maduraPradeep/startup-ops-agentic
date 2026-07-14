@@ -1,4 +1,4 @@
-import { useApproveLeaveRequest } from '../queries/useLeaveRequests';
+import { useApproveLeaveRequest, useRejectLeaveRequest, useUpdateLeaveRequest } from '../queries/useLeaveRequests';
 import { ApprovalCard } from '../views/cards/ApprovalCard';
 
 interface ApprovalAction {
@@ -18,13 +18,28 @@ interface Props {
 
 export function ApprovalController({ action }: Props) {
   const approve = useApproveLeaveRequest();
+  const reject = useRejectLeaveRequest();
+  const update = useUpdateLeaveRequest();
+
+  const handleReject = (id: string) => {
+    const notes = window.prompt('Please provide a reason for rejection (optional):');
+    if (notes !== null) {
+      reject.mutate({ id, notes });
+    }
+  };
 
   return (
     <ApprovalCard
       action={action}
-      isPending={approve.isPending}
+      isPending={approve.isPending || reject.isPending || update.isPending}
       onApprove={(id) => approve.mutate({ id })}
-      onReject={(_id) => { /* TODO: wire reject mutation */ }}
+      onReject={handleReject}
+      onModify={(id) => {
+        const notes = window.prompt('Enter modifications or notes:');
+        if (notes) {
+          update.mutate({ id, data: { reason: notes } });
+        }
+      }}
     />
   );
 }
